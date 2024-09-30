@@ -14,7 +14,7 @@
 std::unordered_set<void *> debug_coro_count;
 #endif
 
-namespace cppcoro
+namespace ucoro
 {
 	template <typename T>
 	struct awaitable;
@@ -293,7 +293,7 @@ namespace cppcoro
 		auto result = awaitable<void>{std::coroutine_handle<awaitable_promise<void>>::from_promise(*this)};
 		return result;
 	}
-} // namespace cppcoro
+} // namespace ucoro
 
 //////////////////////////////////////////////////////////////////////////
 
