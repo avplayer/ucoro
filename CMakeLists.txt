@@ -9,6 +9,7 @@ add_library(ucoro INTERFACE)
 target_include_directories(ucoro INTERFACE include)
 
 
+enable_testing()
 add_executable(test1 test/test1.cpp)
 
 target_link_libraries(test1 ucoro Boost::boost Boost::thread)
