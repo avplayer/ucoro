@@ -95,8 +95,8 @@ BraceWrapping:
   AfterExternBlock: true
   BeforeCatch: true
   BeforeElse: true
-  BeforeLambdaBody: false
-  BeforeWhile: false
+  BeforeLambdaBody: true
+  BeforeWhile: true
   IndentBraces: false
   SplitEmptyFunction: true
   SplitEmptyRecord: true
@@ -151,16 +151,16 @@ IncludeCategories:
 IncludeIsMainRegex: (Test)?$
 IncludeIsMainSourceRegex: ""
 IndentAccessModifiers: false
-IndentCaseBlocks: false
+IndentCaseBlocks: true
 IndentCaseLabels: false
-IndentExternBlock: AfterExternBlock
+IndentExternBlock: NoIndent
 IndentGotoLabels: true
 IndentPPDirectives: None
 IndentRequiresClause: true
 IndentWidth: 4
-IndentWrappedFunctionNames: false
-InsertBraces: false
-InsertNewlineAtEOF: false
+IndentWrappedFunctionNames: true
+InsertBraces: true
+InsertNewlineAtEOF: true
 InsertTrailingCommas: None
 IntegerLiteralSeparator:
   Binary: 0
@@ -175,7 +175,7 @@ KeepEmptyLines:
   AtEndOfFile: false
   AtStartOfBlock: true
   AtStartOfFile: true
-LambdaBodyIndentation: Signature
+LambdaBodyIndentation: OuterScope
 Language: Cpp
 LineEnding: DeriveLF
 MacroBlockBegin: ""
