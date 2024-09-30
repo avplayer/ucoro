@@ -1,3 +1,8 @@
+
+#include <boost/asio.hpp>
+#include <iostream>
+#include "ucoro/awaitable.hpp"
+
 boost::asio::io_context main_ioc;
 
 ucoro::awaitable<int> coro_compute_int(int value)
