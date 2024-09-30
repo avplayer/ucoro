@@ -50,7 +50,9 @@ namespace ucoro
 			{
 				void *ptr = malloc(size);
 				if (!ptr)
+				{
 					throw std::bad_alloc{};
+				}
 				debug_coro_count.insert(ptr);
 				return ptr;
 			}
@@ -80,7 +82,9 @@ namespace ucoro
 		std::coroutine_handle<> await_suspend(std::coroutine_handle<awaitable_promise<T>> h) noexcept
 		{
 			if (h.promise().continuation_)
+			{
 				return h.promise().continuation_;
+			}
 			return std::noop_coroutine();
 		}
 	};
@@ -124,7 +128,9 @@ namespace ucoro
 		{
 			void *ptr = malloc(size);
 			if (!ptr)
+			{
 				throw std::bad_alloc{};
+			}
 			debug_coro_count.insert(ptr);
 			return ptr;
 		}
@@ -176,7 +182,9 @@ namespace ucoro
 		{
 			void *ptr = malloc(size);
 			if (!ptr)
+			{
 				throw std::bad_alloc{};
+			}
 			debug_coro_count.insert(ptr);
 			return ptr;
 		}
@@ -207,7 +215,9 @@ namespace ucoro
 		~awaitable()
 		{
 			if (current_coro_handle_ && current_coro_handle_.done())
+			{
 				current_coro_handle_.destroy();
+			}
 		}
 
 		awaitable(awaitable &&t) noexcept : current_coro_handle_(t.current_coro_handle_)
@@ -220,7 +230,9 @@ namespace ucoro
 			if (&t != this)
 			{
 				if (current_coro_handle_)
+				{
 					current_coro_handle_.destroy();
+				}
 				current_coro_handle_ = t.current_coro_handle_;
 				t.current_coro_handle_ = nullptr;
 			}
@@ -238,7 +250,9 @@ namespace ucoro
 		T get()
 		{
 			if constexpr (!std::is_same_v<T, void>)
+			{
 				return std::move(current_coro_handle_.promise().value);
+			}
 		}
 
 		bool await_ready() const noexcept
@@ -376,7 +390,8 @@ public:
 
 	void await_suspend(std::coroutine_handle<> handle)
 	{
-		callback_function_([handle = std::move(handle), this](T t) mutable {
+		callback_function_([handle = std::move(handle), this](T t) mutable
+		{
 			result_ = std::move(t);
 			handle.resume();
 		});
