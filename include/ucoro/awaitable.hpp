@@ -16,9 +16,11 @@ std::unordered_set<void *> global_crors;
 
 namespace cppcoro
 {
-	template <typename T> struct awaitable;
+	template <typename T>
+	struct awaitable;
 
-	template <typename T> struct awaitable_promise;
+	template <typename T>
+	struct awaitable_promise;
 
 	//////////////////////////////////////////////////////////////////////////
 	struct awaitable_detached
@@ -65,7 +67,8 @@ namespace cppcoro
 
 	//////////////////////////////////////////////////////////////////////////
 
-	template <typename T> struct final_awaitable
+	template <typename T>
+	struct final_awaitable
 	{
 		bool await_ready() noexcept
 		{
@@ -86,7 +89,8 @@ namespace cppcoro
 	// 返回 T 的协程 awaitable_promise 实现.
 
 	// Promise 类型实现...
-	template <typename T> struct awaitable_promise
+	template <typename T>
+	struct awaitable_promise
 	{
 		awaitable<T> get_return_object();
 
@@ -104,7 +108,8 @@ namespace cppcoro
 		{
 		}
 
-		template <typename V> void return_value(V &&v) noexcept
+		template <typename V>
+		void return_value(V &&v) noexcept
 		{
 			value = std::forward<V>(v);
 		}
@@ -139,7 +144,8 @@ namespace cppcoro
 	//////////////////////////////////////////////////////////////////////////
 	// 返回 void 的协程偏特化 awaitable_promise 实现
 
-	template <> struct awaitable_promise<void>
+	template <>
+	struct awaitable_promise<void>
 	{
 		awaitable<void> get_return_object();
 
@@ -189,7 +195,8 @@ namespace cppcoro
 	//////////////////////////////////////////////////////////////////////////
 
 	// awaitable 协程包装...
-	template <typename T> struct awaitable
+	template <typename T>
+	struct awaitable
 	{
 		using promise_type = awaitable_promise<T>;
 
@@ -274,7 +281,8 @@ namespace cppcoro
 
 	//////////////////////////////////////////////////////////////////////////
 
-	template <typename T> awaitable<T> awaitable_promise<T>::get_return_object()
+	template <typename T>
+	awaitable<T> awaitable_promise<T>::get_return_object()
 	{
 		auto result = awaitable<T>{std::coroutine_handle<awaitable_promise<T>>::from_promise(*this)};
 		return result;
@@ -289,7 +297,8 @@ namespace cppcoro
 
 //////////////////////////////////////////////////////////////////////////
 
-template <typename T, typename CallbackFunction> struct CallbackAwaiter
+template <typename T, typename CallbackFunction>
+struct CallbackAwaiter
 {
 public:
 	CallbackAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
@@ -317,7 +326,8 @@ private:
 	T result_;
 };
 
-template <typename CallbackFunction> struct CallbackAwaiter<void, CallbackFunction>
+template <typename CallbackFunction>
+struct CallbackAwaiter<void, CallbackFunction>
 {
 public:
 	CallbackAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
@@ -343,14 +353,16 @@ private:
 	CallbackFunction callback_function_;
 };
 
-template <typename T, typename callback> CallbackAwaiter<T, callback> callback_awaitable(callback &&cb)
+template <typename T, typename callback>
+CallbackAwaiter<T, callback> callback_awaitable(callback &&cb)
 {
 	return CallbackAwaiter<T, callback>{std::forward<callback>(cb)};
 }
 
 //////////////////////////////////////////////////////////////////////////
 
-template <typename T, typename CallbackFunction> struct ManualAwaiter
+template <typename T, typename CallbackFunction>
+struct ManualAwaiter
 {
 public:
 	ManualAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
@@ -380,7 +392,8 @@ private:
 	T result_;
 };
 
-template <typename CallbackFunction> struct ManualAwaiter<void, CallbackFunction>
+template <typename CallbackFunction>
+struct ManualAwaiter<void, CallbackFunction>
 {
 public:
 	ManualAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
@@ -405,12 +418,14 @@ private:
 	CallbackFunction callback_function_;
 };
 
-template <typename T, typename callback> ManualAwaiter<T, callback> manual_awaitable(callback &&cb)
+template <typename T, typename callback>
+ManualAwaiter<T, callback> manual_awaitable(callback &&cb)
 {
 	return ManualAwaiter<T, callback>{std::forward<callback>(cb)};
 }
 
-template <typename Awaitable> void coro_start(Awaitable &&a)
+template <typename Awaitable>
+void coro_start(Awaitable &&a)
 {
 	a.detach();
 }
