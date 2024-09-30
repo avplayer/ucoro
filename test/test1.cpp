@@ -1,6 +1,6 @@
 boost::asio::io_context main_ioc;
 
-cppcoro::awaitable<int> coro_compute_int(int value)
+ucoro::awaitable<int> coro_compute_int(int value)
 {
 	auto ret = co_await manual_awaitable<int>([value](auto handle) {
 		main_ioc.post([value, handle = std::move(handle)]() mutable {
@@ -13,14 +13,14 @@ cppcoro::awaitable<int> coro_compute_int(int value)
 	co_return (value + ret);
 }
 
-cppcoro::awaitable<void> coro_compute_exec(int value)
+ucoro::awaitable<void> coro_compute_exec(int value)
 {
 	auto ret = co_await coro_compute_int(value);
 	std::cout << "return: " << ret << std::endl;
 	co_return;
 }
 
-cppcoro::awaitable<void> coro_compute()
+ucoro::awaitable<void> coro_compute()
 {
 	for (auto i = 0; i < 100; i++)
 	{
