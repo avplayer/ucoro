@@ -249,7 +249,7 @@ namespace ucoro
 
 		T get()
 		{
-			if constexpr (!std::is_same_v<T, void>)
+			if constexpr (!std::is_void_v<T>)
 			{
 				return std::move(current_coro_handle_.promise().value_);
 			}
