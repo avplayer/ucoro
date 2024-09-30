@@ -11,7 +11,7 @@
 
 #if defined(DEBUG) || defined(_DEBUG)
 #include <unordered_set>
-std::unordered_set<void *> global_crors;
+std::unordered_set<void *> debug_coro_count;
 #endif
 
 namespace cppcoro
@@ -49,13 +49,13 @@ namespace cppcoro
 				void *ptr = malloc(size);
 				if (!ptr)
 					throw std::bad_alloc{};
-				global_crors.insert(ptr);
+				debug_coro_count.insert(ptr);
 				return ptr;
 			}
 
 			void operator delete(void *ptr, std::size_t size)
 			{
-				global_crors.erase(ptr);
+				debug_coro_count.erase(ptr);
 				(void)size;
 				free(ptr);
 			}
@@ -120,13 +120,13 @@ namespace cppcoro
 			void *ptr = malloc(size);
 			if (!ptr)
 				throw std::bad_alloc{};
-			global_crors.insert(ptr);
+			debug_coro_count.insert(ptr);
 			return ptr;
 		}
 
 		void operator delete(void *ptr, std::size_t size)
 		{
-			global_crors.erase(ptr);
+			debug_coro_count.erase(ptr);
 			(void)size;
 			free(ptr);
 		}
@@ -171,13 +171,13 @@ namespace cppcoro
 			void *ptr = malloc(size);
 			if (!ptr)
 				throw std::bad_alloc{};
-			global_crors.insert(ptr);
+			debug_coro_count.insert(ptr);
 			return ptr;
 		}
 
 		void operator delete(void *ptr, std::size_t size)
 		{
-			global_crors.erase(ptr);
+			debug_coro_count.erase(ptr);
 			(void)size;
 			free(ptr);
 		}
