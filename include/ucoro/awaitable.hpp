@@ -113,9 +113,9 @@ namespace ucoro
 		}
 
 		template <typename V>
-		void return_value(V &&v) noexcept
+		void return_value(V &&val) noexcept
 		{
-			value = std::forward<V>(v);
+			value_ = std::forward<V>(val);
 		}
 
 		void reset_handle(std::coroutine_handle<> h)
@@ -144,7 +144,7 @@ namespace ucoro
 #endif
 
 		std::coroutine_handle<> continuation_;
-		T value; // 用于存储协程返回的值
+		T value_; // 用于存储协程返回的值
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -251,7 +251,7 @@ namespace ucoro
 		{
 			if constexpr (!std::is_same_v<T, void>)
 			{
-				return std::move(current_coro_handle_.promise().value);
+				return std::move(current_coro_handle_.promise().value_);
 			}
 		}
 
@@ -269,7 +269,7 @@ namespace ucoro
 			}
 			else
 			{
-				auto ret = std::move(current_coro_handle_.promise().value);
+				auto ret = std::move(current_coro_handle_.promise().value_);
 				current_coro_handle_.destroy();
 				current_coro_handle_ = nullptr;
 
