@@ -26,7 +26,7 @@ namespace ucoro
 	struct awaitable_promise;
 
 	template <typename T, typename CallbackFunction>
-	struct ManualAwaiter;
+	struct ExecutorAwaiter;
 
 	template <typename T, typename CallbackFunction>
 	struct CallbackAwaiter;
@@ -429,10 +429,10 @@ CallbackAwaiter<T, callback> callback_awaitable(callback &&cb)
 //////////////////////////////////////////////////////////////////////////
 
 template <typename T, typename CallbackFunction>
-struct ManualAwaiter
+struct ExecutorAwaiter
 {
 public:
-	ManualAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
+	ExecutorAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
 	{
 	}
 
@@ -461,10 +461,10 @@ private:
 };
 
 template <typename CallbackFunction>
-struct ManualAwaiter<void, CallbackFunction>
+struct ExecutorAwaiter<void, CallbackFunction>
 {
 public:
-	ManualAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
+	ExecutorAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
 	{
 	}
 
@@ -487,9 +487,9 @@ private:
 };
 
 template <typename T, typename callback>
-ManualAwaiter<T, callback> manual_awaitable(callback &&cb)
+ExecutorAwaiter<T, callback> executor_awaitable(callback &&cb)
 {
-	return ManualAwaiter<T, callback>{std::forward<callback>(cb)};
+	return ExecutorAwaiter<T, callback>{std::forward<callback>(cb)};
 }
 
 template <typename Awaitable, typename Local>
