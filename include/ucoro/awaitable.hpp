@@ -314,10 +314,10 @@ namespace ucoro
 		{
 			current_coro_handle_.promise().continuation_ = continuation;
 
-            if constexpr (std::is_base_of_v<awaitable_promise_base, PromiseType>)
+			if constexpr (std::is_base_of_v<awaitable_promise_base, PromiseType>)
 			{
-                current_coro_handle_.promise().local_ = continuation.promise().local_;
-            }
+				current_coro_handle_.promise().local_ = continuation.promise().local_;
+			}
 
 			return current_coro_handle_;
 		}
