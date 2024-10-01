@@ -189,4 +189,28 @@ main 是一个传统函数， 它调用了 A() 以后，在它的视角，它获
 
 ## awaitable 里面的魔法
 
+### awaitable 的构造魔法
+
+虽然 例子上的函数 A、B、C 其返回类是 ```awaitable<>``` 但是，函数内部并没有构造这个对象。
+也就是说，编译器看到函数内部使用了 ```co_return```/```co_await``` 关键字，就自动的构造 awaitable<> 对象。
+但是， ```awaitable<>``` 实际上并不是标准库类型，而是用户自定义类。因此，c++必须定义某种协议，帮助编译器将协程和用户自定义类给联系起来。
+
+这个协议就是, 对  T func_A() 这样的函数来说，如果 func_A 内部出现了 co_await/co_return关键字，就会寻找 T 类型的 T::promise_type::get_return_object 函数。
+
+这种寻找用户自定义类型里的特定函数以实现编译器功能的桥接的协议，自c++11始就大行其道了。
+
+首先要明确一点，awaitable 对象，是由程序员安排生命周期的。例如例子里，main 里调用 A().resume()， 就是构造了一个临时对象。
+而 awaitalbe::promise_type 对象，则是由编译器安排在堆上分配的。promise_type 是跟着协程的生命期走的。
+
+当协程调用发生的时候， 编译器调用 awaitable::promise_type::operator new() 操作符分配一个新的 promise_type 对象，并调用他的 get_return_object 构造一个 awaitable 对象然后返回。 因此 awaitable 对象也是要求不可复制，但是可移动。确保 awaitable 对象的唯一性。
+
+###  co_await 和 co_return 的魔法
+
+讲完构造，接下来讲 co_await 和 co_return 分别发生了什么。
+
+在 A 函数里， co_await B(); 指令发生的时候，编译器实际上生成的代码，是调用了 B() 创建了一个临时对象。然后调用这个临时对象的 await_suspend, 传入 A 的引用，以便 B 建立“返回地址为A” 的链。接着调用 B临时对象的 await_resume , 将控制权交给 B ，从而执行 B 的函数体。
+
+在 B 函数的 co_return 指令发生的时候， 编译器实际上生成的代码，是调用 B 对象的 promise_type 里面的 final_suspend . 在 final_suspend 里， B 找到了自己的“返回地址”（其实这里应该叫 调用者，不是程序地址”），然后调用 调用者的 await_resume. 这样控制权就回到了 A 函数。由于前文说过，协程函数，就是一种可重入函数。因此 await_resume 会“自动”的跳入上一次 suspend 的地方。于是这个地方，就恰如其事的 就是 ```co_await B();``` 这个地方。如果 这里正好写了 ```int b_ret = co_await B();```, 那么编译器此时还会调用 B 对象的 return_value(b_ret) 获取返回的数值。
+
+
 
