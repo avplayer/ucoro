@@ -14,7 +14,7 @@
 
 #if defined(DEBUG) || defined(_DEBUG)
 #include <unordered_set>
-std::unordered_set<void *> debug_coro_count;
+inline std::unordered_set<void *> debug_coro_count;
 #endif
 
 namespace ucoro
