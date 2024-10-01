@@ -22,6 +22,15 @@ namespace ucoro
 	template <typename T>
 	struct awaitable_promise;
 
+	template <typename T, typename CallbackFunction>
+	struct ManualAwaiter;
+
+	template <typename T, typename CallbackFunction>
+	struct CallbackAwaiter;
+
+	struct local_storage_t {};
+	inline constexpr local_storage_t local_storage;
+
 	//////////////////////////////////////////////////////////////////////////
 	struct awaitable_detached
 	{
@@ -89,27 +98,67 @@ namespace ucoro
 		}
 	};
 
+
+	//////////////////////////////////////////////////////////////////////////
+	//
+
+	struct awaitable_promise_base
+	{
+		auto initial_suspend() {
+			return std::suspend_always{};
+		}
+
+		void unhandled_exception() {}
+
+		void reset_handle(std::coroutine_handle<> h) {
+			continuation_ = h;
+		}
+
+		template <typename A>
+		auto await_transform(A awaiter) const
+		{
+			return awaiter;
+		}
+
+		auto await_transform(local_storage_t) noexcept
+		{
+			struct result
+			{
+				awaitable_promise_base* this_;
+
+				bool await_ready() const noexcept
+				{
+					return true;
+				}
+
+				void await_suspend(std::coroutine_handle<void>) noexcept
+				{
+				}
+
+				auto await_resume() const noexcept
+				{
+					return 42; // TODO: 实现从 this_ 中返回 local_
+				}
+			};
+
+			return result{this};
+		}
+
+		std::coroutine_handle<> continuation_;
+	};
+
 	//////////////////////////////////////////////////////////////////////////
 	// 返回 T 的协程 awaitable_promise 实现.
 
 	// Promise 类型实现...
 	template <typename T>
-	struct awaitable_promise
+	struct awaitable_promise : public awaitable_promise_base
 	{
 		awaitable<T> get_return_object();
-
-		auto initial_suspend()
-		{
-			return std::suspend_always{};
-		}
 
 		auto final_suspend() noexcept
 		{
 			return final_awaitable<T>{};
-		}
-
-		void unhandled_exception()
-		{
 		}
 
 		template <typename V>
@@ -118,11 +167,6 @@ namespace ucoro
 			value_ = std::forward<V>(val);
 		}
 
-		void reset_handle(std::coroutine_handle<> h)
-		{
-			continuation_ = h;
-		}
-
 #if defined(DEBUG) || defined(_DEBUG)
 		void *operator new(std::size_t size)
 		{
@@ -142,8 +186,6 @@ namespace ucoro
 			free(ptr);
 		}
 #endif
-
-		std::coroutine_handle<> continuation_;
 		T value_; // 用于存储协程返回的值
 	};
 
@@ -151,30 +193,17 @@ namespace ucoro
 	// 返回 void 的协程偏特化 awaitable_promise 实现
 
 	template <>
-	struct awaitable_promise<void>
+	struct awaitable_promise<void> : public awaitable_promise_base
 	{
 		awaitable<void> get_return_object();
-
-		auto initial_suspend()
-		{
-			return std::suspend_always{};
-		}
 
 		auto final_suspend() noexcept
 		{
 			return final_awaitable<void>{};
 		}
 
-		void unhandled_exception()
-		{
-		}
 		void return_void()
 		{
-		}
-
-		void reset_handle(std::coroutine_handle<> h)
-		{
-			continuation_ = h;
 		}
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -196,8 +225,6 @@ namespace ucoro
 			free(ptr);
 		}
 #endif
-
-		std::coroutine_handle<> continuation_;
 	};
 
 	//////////////////////////////////////////////////////////////////////////

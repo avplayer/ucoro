@@ -27,6 +27,9 @@ ucoro::awaitable<void> coro_compute_exec(int value)
 
 ucoro::awaitable<void> coro_compute()
 {
+	auto x = co_await ucoro::local_storage;
+	std::cout << "local storage: " << x << std::endl;
+
 	for (auto i = 0; i < 100; i++)
 	{
 		co_await coro_compute_exec(i);
