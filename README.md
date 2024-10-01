@@ -210,7 +210,12 @@ main 是一个传统函数， 它调用了 A() 以后，在它的视角，它获
 
 在 A 函数里， co_await B(); 指令发生的时候，编译器实际上生成的代码，是调用了 B() 创建了一个临时对象。然后调用这个临时对象的 await_suspend, 传入 A 的引用，以便 B 建立“返回地址为A” 的链。接着调用 B临时对象的 await_resume , 将控制权交给 B ，从而执行 B 的函数体。
 
-在 B 函数的 co_return 指令发生的时候， 编译器实际上生成的代码，是调用 B 对象的 promise_type 里面的 final_suspend . 在 final_suspend 里， B 找到了自己的“返回地址”（其实这里应该叫 调用者，不是程序地址”），然后调用 调用者的 await_resume. 这样控制权就回到了 A 函数。由于前文说过，协程函数，就是一种可重入函数。因此 await_resume 会“自动”的跳入上一次 suspend 的地方。于是这个地方，就恰如其事的 就是 ```co_await B();``` 这个地方。如果 这里正好写了 ```int b_ret = co_await B();```, 那么编译器此时还会调用 B 对象的 return_value(b_ret) 获取返回的数值。
+在 B 函数的 co_return 指令发生的时候， 编译器实际上生成的代码，是调用 B 对象的 promise_type 里面的 final_suspend . 在 final_suspend 里， B 找到了自己的“返回地址”（其实这里应该叫 调用者，不是程序地址”），然后调用 调用者的 await_resume. 这样控制权就回到了 A 函数。由于前文说过，协程函数，就是一种可重入函数。因此 await_resume 会“自动”的跳入上一次 suspend 的地方。于是这个地方，就恰如其事的 就是 ```co_await B();``` 这个地方。
 
+### awaiter 和 promise 角色关系
 
+能被放到 co_await 关键字后面的对象，叫 awaiter。如本库的 ucoro::awaitable<> 类型。 awaiter 必须要有 await_suspend/await_resume/await_ready 成员。
+
+一个能运转起来的 coro 库，必须要至少包括3个类： general awaiter / promise / final awaiter。
+其中， general awaiter 就是用户可以写在 函数签名上的那个返回类型。它必须要有一个内嵌的 promsie_type 类声明。然后这个 promise 必须要有一个负责收尾的 final awaiter。
 
