@@ -141,7 +141,7 @@ namespace ucoro
 
 				auto await_resume() const noexcept
 				{
-					return this_->local_;
+					return *this_->local_;
 				}
 			};
 
