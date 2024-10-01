@@ -36,19 +36,19 @@ so, c++20协程，是无栈协程的一种。
 
 ```cpp
 
-cppcoro::awaitable<int> C(int value) {
+ucoro::awaitable<int> C(int value) {
     std::cout << value << " value\n";
 	co_return (value * 100 + value);
 }
 
-cppcoro::awaitable<void> B(int value)
+ucoro::awaitable<void> B(int value)
 {
 	auto ret = co_await C(value);
 	std::cout << "return: " << ret << std::endl;
 	co_return;
 }
 
-cppcoro::awaitable<void> A() {
+ucoro::awaitable<void> A() {
 	for (auto i = 0; i < 1000000; i++) {
 		co_await B(i);
 	}
@@ -147,19 +147,19 @@ B_body 的首次 return ， 并不是真的函数返回里，而是“挂起”�
 
 ```cpp
 
-cppcoro::awaitable<int> C(int value) {
+ucoro::awaitable<int> C(int value) {
     std::cout << value << " value\n";
 	co_return (value * 100 + value);
 }
 
-cppcoro::awaitable<void> B(int value)
+ucoro::awaitable<void> B(int value)
 {
 	auto ret = co_await C(value);
 	std::cout << "return: " << ret << std::endl;
 	co_return;
 }
 
-cppcoro::awaitable<void> A() {
+ucoro::awaitable<void> A() {
 	for (auto i = 0; i < 1000000; i++) {
 		co_await B(i);
 	}
