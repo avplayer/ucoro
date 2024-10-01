@@ -1,18 +1,12 @@
-
-#include <boost/asio.hpp>
 #include <iostream>
 #include "ucoro/awaitable.hpp"
 
-boost::asio::io_context main_ioc;
 
 ucoro::awaitable<int> coro_compute_int(int value)
 {
-	auto ret = co_await manual_awaitable<int>([value](auto handle) {
-		main_ioc.post([value, handle = std::move(handle)]() mutable {
-			std::this_thread::sleep_for(std::chrono::seconds(0));
-			std::cout << value << " value\n";
-			handle(value * 100);
-		});
+	auto ret = co_await callback_awaitable<int>([value](auto handle) {
+		std::cout << value << " value\n";
+		handle(value * 100);
 	});
 
 	co_return (value + ret);
@@ -28,7 +22,7 @@ ucoro::awaitable<void> coro_compute_exec(int value)
 ucoro::awaitable<void> coro_compute()
 {
 	auto x = co_await ucoro::local_storage;
-	std::cout << "local storage: " << x << std::endl;
+	// std::cout << "local storage: " << std::any_cast<std::string>(x) << std::endl;
 
 	for (auto i = 0; i < 100; i++)
 	{
@@ -38,7 +32,9 @@ ucoro::awaitable<void> coro_compute()
 
 int main(int argc, char **argv)
 {
-	coro_start(coro_compute());
-	main_ioc.run();
+	std::string str = "hello";
+
+	coro_start(coro_compute(), str);
+
 	return 0;
 }

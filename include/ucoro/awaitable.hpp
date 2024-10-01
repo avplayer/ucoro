@@ -8,6 +8,9 @@
 #include <coroutine>
 #include <functional>
 #include <type_traits>
+#include <memory>
+#include <any>
+#include <cassert>
 
 #if defined(DEBUG) || defined(_DEBUG)
 #include <unordered_set>
@@ -40,20 +43,25 @@ namespace ucoro
 			{
 				return {};
 			}
+
 			std::suspend_never final_suspend() noexcept
 			{
 				return {};
 			}
+
 			void return_void() noexcept
 			{
 			}
+
 			void unhandled_exception()
 			{
 			}
+
 			awaitable_detached get_return_object() noexcept
 			{
 				return awaitable_detached();
 			}
+
 #if defined(DEBUG) || defined(_DEBUG)
 			void *operator new(std::size_t size)
 			{
@@ -110,10 +118,6 @@ namespace ucoro
 
 		void unhandled_exception() {}
 
-		void reset_handle(std::coroutine_handle<> h) {
-			continuation_ = h;
-		}
-
 		template <typename A>
 		auto await_transform(A awaiter) const
 		{
@@ -137,7 +141,7 @@ namespace ucoro
 
 				auto await_resume() const noexcept
 				{
-					return 42; // TODO: 实现从 this_ 中返回 local_
+					return this_->local_;
 				}
 			};
 
@@ -145,6 +149,7 @@ namespace ucoro
 		}
 
 		std::coroutine_handle<> continuation_;
+		std::shared_ptr<std::any> local_;
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -304,16 +309,37 @@ namespace ucoro
 			}
 		}
 
-		auto await_suspend(std::coroutine_handle<> continuation)
+		template <typename PromiseType>
+		auto await_suspend(std::coroutine_handle<PromiseType> continuation)
 		{
-			current_coro_handle_.promise().reset_handle(continuation);
+			current_coro_handle_.promise().continuation_ = continuation;
+
+            if constexpr (std::is_base_of_v<awaitable_promise_base, PromiseType>)
+			{
+                current_coro_handle_.promise().local_ = continuation.promise().local_;
+            }
+
 			return current_coro_handle_;
+		}
+
+		void set_local(std::any local)
+		{
+			assert("local has value" && !current_coro_handle_.promise().local_);
+			current_coro_handle_.promise().local_ = std::make_shared<std::any>(local);
 		}
 
 		void detach()
 		{
 			auto launch_coro = [](awaitable<T> lazy) -> awaitable_detached { co_await lazy; };
+			[[maybe_unused]] auto detached = launch_coro(std::move(*this));
+		}
 
+		void detach(std::any local)
+		{
+			if (local.has_value())
+				set_local(local);
+
+			auto launch_coro = [](awaitable<T> lazy) -> awaitable_detached { co_await lazy; };
 			[[maybe_unused]] auto detached = launch_coro(std::move(*this));
 		}
 
@@ -464,6 +490,12 @@ template <typename T, typename callback>
 ManualAwaiter<T, callback> manual_awaitable(callback &&cb)
 {
 	return ManualAwaiter<T, callback>{std::forward<callback>(cb)};
+}
+
+template <typename Awaitable, typename Local>
+void coro_start(Awaitable &&a, Local&& local)
+{
+	a.detach(local);
 }
 
 template <typename Awaitable>
