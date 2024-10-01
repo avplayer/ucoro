@@ -1,5 +1,5 @@
 ﻿add_custom_target(ucoro_tests)
-set_target_properties(ucoro_tests PROPERTIES FOLDER "ucoro tests")
+set_target_properties(ucoro_tests PROPERTIES FOLDER "ucoro_tests")
 
 add_subdirectory(test1)
 
