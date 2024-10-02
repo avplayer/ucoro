@@ -35,6 +35,7 @@ ucoro::awaitable<void> coro_compute()
 	{
 		co_await coro_compute_exec(i);
 	}
+	qApp->quit();
 }
 
 int main(int argc, char **argv)
