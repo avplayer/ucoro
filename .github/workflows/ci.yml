@@ -56,7 +56,12 @@ jobs:
       uses: jurplel/install-qt-action@v4.0.0
       with:
         version: 6.6.*
-              
+
+    - name: Download and install Boost
+      uses: MarkusJx/install-boost@v2.4.5
+      with:
+        boost_version: 1.86.0
+    
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
