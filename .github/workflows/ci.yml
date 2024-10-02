@@ -58,6 +58,7 @@ jobs:
         version: 6.6.*
 
     - name: Download and install Boost
+      id: install-boost
       uses: MarkusJx/install-boost@v2.4.5
       with:
         boost_version: 1.86.0
@@ -78,6 +79,8 @@ jobs:
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
+      env:
+          BOOST_ROOT: ${{ steps.install-boost.outputs.BOOST_ROOT }}
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
