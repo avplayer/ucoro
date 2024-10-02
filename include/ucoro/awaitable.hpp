@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <concepts>
 #include <coroutine>
 #include <functional>
 #include <type_traits>
@@ -50,36 +51,17 @@ namespace ucoro
 			: std::true_type
 		{};
 
-		// NOTE: We're accepting a return value of coroutine_handle<P> here
-		// which is an extension supported by Clang which is not yet part of
-		// the C++ coroutines TS.
-		template<typename T>
-		struct is_valid_await_suspend_return_value : std::disjunction<
-			std::is_void<T>,
-			std::is_same<T, bool>,
-			is_coroutine_handle<T>>
-		{};
-
-		template<typename T, typename = std::void_t<>>
-		struct is_awaiter : std::false_type {};
-
 		// NOTE: We're testing whether await_suspend() will be callable using an
 		// arbitrary coroutine_handle here by checking if it supports being passed
 		// a coroutine_handle<void>. This may result in a false-result for some
 		// types which are only awaitable within a certain context.
-		template<typename T>
-		struct is_awaiter<T, std::void_t<
-			decltype(std::declval<T>().await_ready()),
-			decltype(std::declval<T>().await_suspend(std::declval<std::coroutine_handle<>>())),
-			decltype(std::declval<T>().await_resume())>> :
-			std::conjunction<
-				std::is_constructible<bool, decltype(std::declval<T>().await_ready())>,
-				is_valid_await_suspend_return_value<
-					decltype(std::declval<T>().await_suspend(std::declval<std::coroutine_handle<>>()))>>
-		{};
-
 		template <typename T>
-		constexpr bool is_awaiter_v = is_awaiter<T>::value;
+		concept is_awaiter = requires ( T a)
+		{
+			{ a.await_ready() } -> std::convertible_to<bool>;
+			{ a.await_suspend(std::declval<std::coroutine_handle<>>()) }; //-> std::convertible_to<std::coroutine_handle<>>;
+			{ a.await_resume() };
+		};
 	} // namespace detail
 
 
@@ -167,7 +149,7 @@ namespace ucoro
 
 		void unhandled_exception() {}
 
-		template <typename A, typename std::enable_if<detail::is_awaiter_v<A>>::type* = nullptr>
+		template <typename A> requires( detail::is_awaiter<A> )
 		auto await_transform(A awaiter) const
 		{
 			return awaiter;
