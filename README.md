@@ -208,9 +208,53 @@ main 是一个传统函数， 它调用了 A() 以后，在它的视角，它获
 
 讲完构造，接下来讲 co_await 和 co_return 分别发生了什么。
 
-在 A 函数里， co_await B(); 指令发生的时候，编译器实际上生成的代码，是调用了 B() 创建了一个临时对象。然后调用这个临时对象的 await_suspend, 传入 A 的引用，以便 B 建立“返回地址为A” 的链。接着调用 B临时对象的 await_resume , 将控制权交给 B ，从而执行 B 的函数体。
+在 A 函数里， co_await B(); 指令发生的时候，编译器实际上生成的代码，是调用了 B() 创建了一个临时对象。然后调用这个临时对象的 await_suspend, 传入 A 的引用，以便 B 建立“返回地址为A” 的链。接着调用 B临时对象的 resume , 将控制权交给 B ，从而执行 B 的函数体。
 
 在 B 函数的 co_return 指令发生的时候， 编译器实际上生成的代码，是调用 B 对象的 promise_type 里面的 final_suspend . 在 final_suspend 里， B 找到了自己的“返回地址”（其实这里应该叫 调用者，不是程序地址”），然后调用 调用者的 await_resume. 这样控制权就回到了 A 函数。由于前文说过，协程函数，就是一种可重入函数。因此 await_resume 会“自动”的跳入上一次 suspend 的地方。于是这个地方，就恰如其事的 就是 ```co_await B();``` 这个地方。
+
+一句话总结：协程的 co_return 就是调用父级的 resume。协程的  co_await 就是调用 父级的 suspend + 子级的 resume。
+
+那么，思考这么一个代码
+
+```cpp
+
+ucoro::awaitable<void> bar()
+{
+	debugstop2();
+}
+
+ucoro::awaitable<void> foo()
+{
+	debugstop1();
+	co_await bar();
+	debugstop3();
+}
+
+int main()
+{
+	foo().resume();
+}
+
+```
+
+> 在 debugstop1 这个地方，调用栈看起来是  main -> foo.resume -> foo.corobody
+> 在 debugstop2 这个地方，调用栈看起来是  main -> foo.resume -> foo.corobody -> bar.resume -> bar.corobody
+> 在 debugstop3 这个地方，调用栈看起来是  main -> foo.resume -> foo.corobody -> bar.resume -> bar.corobody -> foo.resume -> foo.corobody
+> 在 debugstop3 完毕后，会层层 ret 最终回到 main.
+
+这看起来，在协程里，调用栈是单向增长的。直到最终执行完毕，然后突然伴随着海量的 ret 返回到传统函数的调用处。
+
+
+微软在提交 coro 提案多年后，才突然意识到这个爆栈问题，因此进行了一次补丁更新。解决之道就是强迫编译器为 协程相关代码打开 **尾调用优化**。
+
+在开启 **尾调用优化** 后，
+
+> 在 debugstop1 这个地方，调用栈看起来是  main -> foo.corobody
+> 在 debugstop2 这个地方，调用栈看起来是  main -> bar.corobody
+> 在 debugstop3 这个地方，调用栈看起来是  main -> foo.corobody
+> 在 debugstop3 完毕后，直接到 main.
+
+为了能让编译器 100% 确保 尾调用优化 能实施，微软又双叒叕修改了 协程里 awaiter 对象的 await_suspend 函数定义。确保新定义下，不管你内部代码怎么写，编译器总能使用尾调用优化。
 
 ### awaiter 和 promise 角色关系
 
@@ -219,3 +263,8 @@ main 是一个传统函数， 它调用了 A() 以后，在它的视角，它获
 一个能运转起来的 coro 库，必须要至少包括3个类： general awaiter / promise / final awaiter。
 其中， general awaiter 就是用户可以写在 函数签名上的那个返回类型。它必须要有一个内嵌的 promsie_type 类声明。然后这个 promise 必须要有一个负责收尾的 final awaiter。
 
+由于一个协程是一个闭包，它需要有一个上下文环境来存储中间状态。这个上下文环境就是 promsie。
+
+对于 ```ucoro::awaitable<int> B()``` 这样的函数，其上下文环境就存储在 ```ucoro::awaitalbe<int>::promise_type``` 里。
+
+如果在 A() 函数代码里使用 co_await B(); 这样的表达式，意味着编译器会调用 ucoro::awaitalbe<int> 这个 awaiter。
