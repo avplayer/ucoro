@@ -17,6 +17,16 @@ ucoro::awaitable<void> coro_compute_exec(int value)
 	auto x = co_await ucoro::local_storage;
 	std::cout << "local storage: " << std::any_cast<std::string>(x) << std::endl;
 
+	try
+	{
+		auto y = co_await ucoro::local_storage_t<std::string>();
+		std::cout << "local storage: " << y << std::endl;
+	}
+	catch (const std::exception& e)
+	{
+		std::cout << e.what();
+	}
+
 	auto ret = co_await coro_compute_int(value);
 	std::cout << "return: " << ret << std::endl;
 	co_return;

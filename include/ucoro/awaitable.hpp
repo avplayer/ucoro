@@ -31,8 +31,57 @@ namespace ucoro
 	template <typename T, typename CallbackFunction>
 	struct CallbackAwaiter;
 
+	template <typename T>
 	struct local_storage_t {};
-	inline constexpr local_storage_t local_storage;
+	inline constexpr local_storage_t<void> local_storage;
+
+
+	//////////////////////////////////////////////////////////////////////////
+	/// is_awaiter from https://github.com/lewissbaker/cppcoro/blob/master/include/cppcoro/detail/is_awaiter.hpp
+	namespace detail
+	{
+		template<typename T>
+		struct is_coroutine_handle
+			: std::false_type
+		{};
+
+		template<typename PROMISE>
+		struct is_coroutine_handle<std::coroutine_handle<PROMISE>>
+			: std::true_type
+		{};
+
+		// NOTE: We're accepting a return value of coroutine_handle<P> here
+		// which is an extension supported by Clang which is not yet part of
+		// the C++ coroutines TS.
+		template<typename T>
+		struct is_valid_await_suspend_return_value : std::disjunction<
+			std::is_void<T>,
+			std::is_same<T, bool>,
+			is_coroutine_handle<T>>
+		{};
+
+		template<typename T, typename = std::void_t<>>
+		struct is_awaiter : std::false_type {};
+
+		// NOTE: We're testing whether await_suspend() will be callable using an
+		// arbitrary coroutine_handle here by checking if it supports being passed
+		// a coroutine_handle<void>. This may result in a false-result for some
+		// types which are only awaitable within a certain context.
+		template<typename T>
+		struct is_awaiter<T, std::void_t<
+			decltype(std::declval<T>().await_ready()),
+			decltype(std::declval<T>().await_suspend(std::declval<std::coroutine_handle<>>())),
+			decltype(std::declval<T>().await_resume())>> :
+			std::conjunction<
+				std::is_constructible<bool, decltype(std::declval<T>().await_ready())>,
+				is_valid_await_suspend_return_value<
+					decltype(std::declval<T>().await_suspend(std::declval<std::coroutine_handle<>>()))>>
+		{};
+
+		template <typename T>
+		constexpr bool is_awaiter_v = is_awaiter<T>::value;
+	} // namespace detail
+
 
 	//////////////////////////////////////////////////////////////////////////
 	struct awaitable_detached
@@ -118,13 +167,13 @@ namespace ucoro
 
 		void unhandled_exception() {}
 
-		template <typename A>
+		template <typename A, typename std::enable_if<detail::is_awaiter_v<A>>::type* = nullptr>
 		auto await_transform(A awaiter) const
 		{
 			return awaiter;
 		}
 
-		auto await_transform(local_storage_t) noexcept
+		auto await_transform(local_storage_t<void>) noexcept
 		{
 			struct result
 			{
@@ -145,7 +194,32 @@ namespace ucoro
 				}
 			};
 
-			return result{this};
+			return result{ this };
+		}
+
+		template <typename T>
+		auto await_transform(local_storage_t<T>)
+		{
+			struct result
+			{
+				awaitable_promise_base* this_;
+
+				bool await_ready() const noexcept
+				{
+					return true;
+				}
+
+				void await_suspend(std::coroutine_handle<void>) noexcept
+				{
+				}
+
+				auto await_resume()
+				{
+					return std::any_cast<T>(*this_->local_);
+				}
+			};
+
+			return result{ this };
 		}
 
 		std::coroutine_handle<> continuation_;
@@ -408,7 +482,7 @@ public:
 
 	auto await_suspend(std::coroutine_handle<> handle)
 	{
-		callback_function_([this]() {});
+		callback_function_([]() {});
 		return handle;
 	}
 
