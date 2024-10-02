@@ -1,5 +1,5 @@
 
-# 什么是 µcoro (ucoro)
+# 什么是 µcoro (ucoro) [![actions workflow](https://github.com/avplayer/ucoro/actions/workflows/ci.yml/badge.svg)](https://github.com/avplayer/ucoro/actions)
 
 µcoro 是一个最小化的c++20协程库。精简到不能再删一行代码。
 
