@@ -237,10 +237,10 @@ int main()
 
 ```
 
-> 在 debugstop1 这个地方，调用栈看起来是  main -> foo.resume -> foo.corobody
-> 在 debugstop2 这个地方，调用栈看起来是  main -> foo.resume -> foo.corobody -> bar.resume -> bar.corobody
-> 在 debugstop3 这个地方，调用栈看起来是  main -> foo.resume -> foo.corobody -> bar.resume -> bar.corobody -> foo.resume -> foo.corobody
-> 在 debugstop3 完毕后，会层层 ret 最终回到 main.
+- 在 debugstop1 这个地方，调用栈看起来是  main -> foo.resume -> foo.corobody
+- 在 debugstop2 这个地方，调用栈看起来是  main -> foo.resume -> foo.corobody -> bar.resume -> bar.corobody
+- 在 debugstop3 这个地方，调用栈看起来是  main -> foo.resume -> foo.corobody -> bar.resume -> bar.corobody -> foo.resume -> foo.corobody
+- 在 debugstop3 完毕后，会层层 ret 最终回到 main.
 
 这看起来，在协程里，调用栈是单向增长的。直到最终执行完毕，然后突然伴随着海量的 ret 返回到传统函数的调用处。
 
@@ -249,10 +249,10 @@ int main()
 
 在开启 **尾调用优化** 后，
 
-> 在 debugstop1 这个地方，调用栈看起来是  main -> foo.corobody
-> 在 debugstop2 这个地方，调用栈看起来是  main -> bar.corobody
-> 在 debugstop3 这个地方，调用栈看起来是  main -> foo.corobody
-> 在 debugstop3 完毕后，直接到 main.
+- 在 debugstop1 这个地方，调用栈看起来是  main -> foo.corobody
+- 在 debugstop2 这个地方，调用栈看起来是  main -> bar.corobody
+- 在 debugstop3 这个地方，调用栈看起来是  main -> foo.corobody
+- 在 debugstop3 完毕后，直接到 main.
 
 为了能让编译器 100% 确保 尾调用优化 能实施，微软又双叒叕修改了 协程里 awaiter 对象的 await_suspend 函数定义。确保新定义下，不管你内部代码怎么写，编译器总能使用尾调用优化。
 
