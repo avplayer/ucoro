@@ -269,3 +269,39 @@ int main()
 对于 ```ucoro::awaitable<int> B()``` 这样的函数，其上下文环境就存储在 ```ucoro::awaitalbe<int>::promise_type``` 里。
 
 如果在 A() 函数代码里使用 co_await B(); 这样的表达式，意味着编译器会调用 ucoro::awaitalbe<int> 这个 awaiter。
+
+事实上 A() 函数里调用 auto b_ret_value = co_await B(); 转换后的代码如下
+
+```cpp
+auto temp_b = B();
+handle_of_A.coro_state = coro_state_after_B;
+handle_of_A.promise().await_transform(temp_b).await_suspend(this->corohandle).resume();
+coro_state_after_B:
+auto b_ret_value = temp_b.await_resume();
+```
+
+如果 A() 的 promise_type 里没有 await_transform , 则使用编译器默认的 await_transform, aka 传啥返回啥。
+
+也就是这样
+
+```cpp
+temp_b.await_suspend(this->corohandle).resume();
+```
+
+注意代码中的 coro_state_after_B：标签，这个是用来当 B 里面 co_return 的时候， B 会在 final_awaiter 里调用 A的 resume()。 因为协程是实现为“可重入函数”，所以第二次调用 resume 就会 goto 到这个 lable。
+
+await_transform 一般可以用来实现 co_await 一个非协程对象。比如实现 类似**线程本地存储**的**协程本地存储**。
+
+只要 co_await ucoro::local_storage; 这样的一个写法，就可以跳入
+
+```
+ handle_of_this_coro.promise().await_transform(ucoro::local_storage)。
+```
+
+为何不直接将 ucoro::local_storage 实现为一个 awiter 呢？
+
+因为如果 将 ucoro::local_storage 实现为一个 awiter，则 local_storage 拿不到调用处的 promise() 对象。
+而使用 await_transform , 则可以在 awaitable<>::promise_type::await_transform 里直接拿到 awaitable<> 的 promise 对象，从而获取到和该协程绑定的数据。因为 promise 对象是用户自定义的。用户可以自己往里面赛东西。
+
+除此之外，还可以在 await_transform 里实现对其他人编写的协程库的兼容。
+
