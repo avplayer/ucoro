@@ -12,3 +12,5 @@ endif()
 if(Boost_FOUND)
     add_subdirectory(test2)
 endif(Boost_FOUND)
+
+add_subdirectory(test3)
