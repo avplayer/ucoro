@@ -41,25 +41,11 @@ namespace ucoro
 	/// is_awaiter from https://github.com/lewissbaker/cppcoro/blob/master/include/cppcoro/detail/is_awaiter.hpp
 	namespace detail
 	{
-		template<typename T>
-		struct is_coroutine_handle
-			: std::false_type
-		{};
-
-		template<typename PROMISE>
-		struct is_coroutine_handle<std::coroutine_handle<PROMISE>>
-			: std::true_type
-		{};
-
 		// NOTE: We're accepting a return value of coroutine_handle<P> here
 		// which is an extension supported by Clang which is not yet part of
 		// the C++ coroutines TS.
-		template<typename T>
-		struct is_valid_await_suspend_return_value : std::disjunction<
-			std::is_void<T>,
-			std::is_same<T, bool>,
-			is_coroutine_handle<T>>
-		{};
+		template <typename T>
+		concept is_valid_await_suspend_return_value = std::convertible_to<T, std::coroutine_handle<>> || std::is_void_v<T> || std::is_same_v<T, bool>;
 
 		// NOTE: We're testing whether await_suspend() will be callable using an
 		// arbitrary coroutine_handle here by checking if it supports being passed
@@ -69,7 +55,7 @@ namespace ucoro
 		concept is_awaiter_v = requires ( T a)
 		{
 			{ a.await_ready() } -> std::convertible_to<bool>;
-			{ a.await_suspend(std::declval<std::coroutine_handle<>>()) };// -> ( std::convertible_to<std::coroutine_handle<>> | std::convertible_to<bool> );
+			{ a.await_suspend(std::coroutine_handle<>{}) } ->  is_valid_await_suspend_return_value;
 			{ a.await_resume() };
 		};
 	} // namespace detail
