@@ -292,7 +292,7 @@ namespace ucoro
 	{
 		using promise_type = awaitable_promise<T>;
 
-		awaitable(std::coroutine_handle<promise_type> h) : current_coro_handle_(h)
+		explicit awaitable(std::coroutine_handle<promise_type> h) : current_coro_handle_(h)
 		{
 		}
 
@@ -414,13 +414,14 @@ namespace ucoro
 	}
 } // namespace ucoro
 
+
 //////////////////////////////////////////////////////////////////////////
 
 template <typename T, typename CallbackFunction>
 struct CallbackAwaiter
 {
 public:
-	CallbackAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
+	explicit CallbackAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
 	{
 	}
 
@@ -449,7 +450,7 @@ template <typename CallbackFunction>
 struct CallbackAwaiter<void, CallbackFunction>
 {
 public:
-	CallbackAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
+	explicit CallbackAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
 	{
 	}
 
@@ -484,7 +485,7 @@ template <typename T, typename CallbackFunction>
 struct ExecutorAwaiter
 {
 public:
-	ExecutorAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
+	explicit ExecutorAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
 	{
 	}
 
@@ -516,7 +517,7 @@ template <typename CallbackFunction>
 struct ExecutorAwaiter<void, CallbackFunction>
 {
 public:
-	ExecutorAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
+	explicit ExecutorAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
 	{
 	}
 
