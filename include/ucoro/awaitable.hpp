@@ -38,7 +38,6 @@ namespace ucoro
 
 
 	//////////////////////////////////////////////////////////////////////////
-	/// is_awaiter from https://github.com/lewissbaker/cppcoro/blob/master/include/cppcoro/detail/is_awaiter.hpp
 	namespace detail
 	{
 		// NOTE: We're accepting a return value of coroutine_handle<P> here
