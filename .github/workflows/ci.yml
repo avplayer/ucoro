@@ -47,7 +47,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Install ninja-build tool
+      uses: seanmiddleditch/gha-setup-ninja@v5
 
+    - name: Install Qt
+      # You may pin to the exact commit or the version.
+      # uses: jurplel/install-qt-action@f03f05556819ceb3781ee2f455ec44c339d683c0
+      uses: jurplel/install-qt-action@v4.0.0
+      with:
+        version: 6.6.*
+              
     - name: Set reusable strings
       # Turn repeated input strings (such as the build output directory) into step outputs. These step outputs can be used throughout the workflow file.
       id: strings
