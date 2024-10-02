@@ -221,6 +221,7 @@ main 是一个传统函数， 它调用了 A() 以后，在它的视角，它获
 ucoro::awaitable<void> bar()
 {
 	debugstop2();
+	co_return;
 }
 
 ucoro::awaitable<void> foo()
