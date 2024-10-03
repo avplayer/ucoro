@@ -4,11 +4,11 @@
 
 int main(int argc, char **argv)
 {
-	using CallbackAwaiterType0 = CallbackAwaiter<void, decltype([](auto h) {}) >;
-	using ExecutorAwaiterType0 = ExecutorAwaiter<void, decltype([](auto h) {}) > ;
+	using CallbackAwaiterType0 = ucoro::CallbackAwaiter<void, decltype([](auto h) {}) >;
+	using ExecutorAwaiterType0 = ucoro::ExecutorAwaiter<void, decltype([](auto h) {}) > ;
 
-	using CallbackAwaiterType1 = CallbackAwaiter<int, decltype([](auto h) {}) > ;
-	using ExecutorAwaiterType1 = ExecutorAwaiter<int, decltype([](auto h) {}) > ;
+	using CallbackAwaiterType1 = ucoro::CallbackAwaiter<int, decltype([](auto h) {}) > ;
+	using ExecutorAwaiterType1 = ucoro::ExecutorAwaiter<int, decltype([](auto h) {}) > ;
 
 	static_assert(ucoro::detail::is_awaiter_v < CallbackAwaiterType0 >, "not a coroutine");
 	static_assert(ucoro::detail::is_awaiter_v < ExecutorAwaiterType0 >, "not a coroutine");
