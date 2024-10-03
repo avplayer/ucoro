@@ -305,3 +305,176 @@ await_transform 一般可以用来实现 co_await 一个非协程对象。比如
 
 除此之外，还可以在 await_transform 里实现对其他人编写的协程库的兼容。
 
+## 和 executor 集成
+
+### 协程替换回调地狱
+
+前面的例子里，coro 其实并没有发挥出应有的威力。因为程序员使用 coro, 并不是为了coro而coro, 而是为了简化异步代码。
+
+现有的异步IO, 是围绕 executor 展开的。
+
+executor 实际上是一个闭包列队执行器 + OS 事件派发器。
+
+executor 的内部逻辑通常是
+
+
+```fakecode
+for(;;){
+ev = GetOSEvents();
+
+dispatchEvents(ev);
+
+runHandlers();
+}
+
+```
+
+在 dispatchEvents 主要就是把 ”OS报告某个IO完成“ 这个事情，通知到当初启动IO操作的那段代码，以便代码完成后续工作。这个”通知“的形式，就是“回调”。
+
+有时候，这些回调是“立即执行”，也就是在 dispatchEvents 里至今运行回调。也有时候，这些回调要投递执行。也就是把回调的执行放到一个列队里。稍后由 runHandlers() 统一调用。
+在执行回调的过程中，用户代码可能也会“投递”一个稍后运行的代码。这些任务，就会统统延后到 runHandlers 里运行。
+
+因此，在一个“事件驱动+回调通知”的 executor 模型里，协程就是一个改进“回调地狱”的一个利器。例如，下面这个回调地狱
+
+```
+void some_IO_task()
+{
+	async_connect(home_host, []()
+	{
+		// callback on connected
+		async_send("hello", []()
+		{
+			// callback on data sent
+			async_read(buf, []()
+			{
+				// callback on data read
+				// do some work on data
+				// and send reply
+				async_send("hello", []()
+				{
+					// callback on data sent
+					// now reading more data
+					async_read(buf, []()
+					{
+						// ......... 这嵌套没完没了里啊？
+					});
+				});
+			});
+		});
+	});
+}
+
+```
+
+而使用协程，则优雅的多，相关代码可以改进如下：
+
+```
+void some_IO_task()
+{
+	co_await async_connect(home_host);
+
+	co_await async_send("hello");
+
+	auto read_size = co_await async_read(buf);
+
+	// do some work on data
+	// and send reply
+	co_await async_send("ack");
+
+	// read more data
+	read_size = co_await async_read(buf);
+
+	// ...... more read/reply logic here
+}
+
+```
+
+这下就再也没有回调地狱里。而且代码看起来就非常清爽，就像是使用“同步阻塞”的 IO操作一样。
+
+但是，executor 原生提供的 IO 操作机制，必然是基于 ```async_发起IO ( 传入完成回调)``` 这种模式的。
+
+因此，能返回 awaitable 进而能进行 co_await 操作，必然是在此基础上进行的二次封装。
+
+那么，如何封装呢？
+
+### 回调转协程
+
+首先我们知道，协程继续运行的关键，其实就在与那个 handle 上的  ```resume()```。
+因此，我们只需要考虑
+
+1. 获取到 handle
+2. 在executor的完成回调里，调用 handle.resume()
+3. 如有返回值，在调用 resume 之前，将返回值转储于 promise 里，以便 ```await_resume()``` 能返回数据给 co_await
+
+一开始，我们尝试使用这样的用法
+
+```
+auto callback_coro = co_await callback_coro;
+
+int ret_value;
+async_setupIO([^](auto ret_value_)
+{
+	ret_value = ret_value_;
+	callback_coro.resume();
+});
+
+co_await callback_coro;
+
+```
+
+但是，显然这种二段式用法，容易出错。如果 返回值为 void 的 async_setupIO 可以被直接 co_await， 则整个代码会更加的通俗易懂，而且不易出错。于是我们有了个新的思路
+
+```cpp
+
+int ret_value;
+co_await callback_to_coro([](auto continuation)
+{
+	async_setupIO([&ret_value, continuation](auto ret_value_)
+	{
+		ret_value = ret_value_;
+		continuation.resume();
+	});
+});
+
+```
+
+这次，async_setupIO 和等待是一气呵成了，但是，这返回值有点小小的别扭。
+如果继续改进会如何？
+
+```cpp
+int ret_value = co_await callback_to_coro<int>([](auto continuation)
+{
+	async_setupIO([continuation](auto ret_value_)
+	{
+		continuation(ret_value_);
+	});
+});
+
+// or
+
+int ret_value = co_await callback_to_coro<int>(
+	[](auto continuation){async_setupIO(continuation);});
+
+```
+
+这样，和 co_await async_setupIO 相比，增加的额外代码并不多。不会增加多少心智负担。
+
+### 背后的魔法
+
+首先， callback_to_coro<T> 的返回对象，是一个 awaitable_handle<T> 类型，是一个 awaiter。
+awaitable_handle 有3个魔法：
+
+- 其一为 T await_resume()，实乃返回内部存储的一个 ret_value, 有第三个魔法设置。
+- 其二，为 await_suspend(), 在这里，await_suspend 获取到了 待 resume 的协程的 handle。
+  并且调用用户传入的 lambda , 然后给这个 lambda 传递第三个魔法
+- 第三个魔法，是一个内部的wrapper函数。这个函数会被提交给 executor 调用。
+  因此这个函数，会在内部，保存返回值，然后调用 handle 的 resume();
+
+
+因此，更新上面的断言，
+
+一个能运转起来的 coro 库，必须要至少包括4个类： general awaiter / promise / final awaiter/ callbackhandle awaiter。
+其中， general awaiter 就是用户可以写在 函数签名上的那个返回类型。它必须要有一个内嵌的 promsie_type 类声明。然后这个 promise 必须要有一个负责收尾的 final awaiter。
+
+因为，第四个类，也是必要的。否则一个不能和 executor 搭配起来干活的协程将毫无意义。
+
