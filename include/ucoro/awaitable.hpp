@@ -8,12 +8,18 @@
 #include <concepts>
 
 # if defined(__has_include)
+
 #if __has_include(<coroutine>)
 #	include <coroutine>
 #	define UCORO_HAS_STD_COROUTINE
 #else
 #	include <experimental/coroutine>
 #endif
+
+#else
+
+#error "Compiler version too low to support coroutine !!!"
+
 #endif
 
 #include <functional>
