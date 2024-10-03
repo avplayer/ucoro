@@ -10,7 +10,7 @@
 # if defined(__has_include)
 #if __has_include(<coroutine>)
 #	include <coroutine>
-#	defined UCORO_HAS_STD_COROUTINE
+#	define UCORO_HAS_STD_COROUTINE
 #else
 #	include <experimental/coroutine>
 #endif
