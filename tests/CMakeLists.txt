@@ -15,7 +15,12 @@ endif(Boost_FOUND)
 
 add_subdirectory(test3)
 
-find_package(Qt6 6.6 COMPONENTS Core)
+if(CMAKE_VERSION VERSION_LESS "3.30")
+    find_package(Qt 6.6 COMPONENTS Core)
+else()
+    find_package(Qt 6.6 CONFIG Core)
+endif()
+
 if(Qt6_FOUND)
     add_subdirectory(testqt)
 endif(Qt6_FOUND)

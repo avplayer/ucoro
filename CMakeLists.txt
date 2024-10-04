@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 cmake_policy(SET CMP0091 NEW) # required for /MT /MD flag with msvc
+cmake_policy(SET CMP0084 NEW)
+cmake_policy(SET CMP0079 NEW)
+
 project(µcoro)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
