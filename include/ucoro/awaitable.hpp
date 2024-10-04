@@ -566,13 +566,13 @@ ucoro::ExecutorAwaiter<T, callback> executor_awaitable(callback &&cb)
 }
 
 template <typename Awaitable, typename Local>
-void coro_start(Awaitable &&a, Local &&local)
+void coro_start(Awaitable &&coro, Local &&local)
 {
-	a.detach(local);
+	coro.detach(local);
 }
 
 template <typename Awaitable>
-void coro_start(Awaitable &&a)
+void coro_start(Awaitable &&coro)
 {
-	a.detach();
+	coro.detach();
 }
