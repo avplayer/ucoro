@@ -543,25 +543,16 @@ namespace ucoro
 	};
 
 	template <typename CallbackFunction>
-	struct ExecutorAwaiter<void, CallbackFunction>
+	struct ExecutorAwaiter<void, CallbackFunction> : std::suspend_always
 	{
 	public:
 		explicit ExecutorAwaiter(CallbackFunction &&callback_function) : callback_function_(std::move(callback_function))
 		{
 		}
 
-		bool await_ready() noexcept
-		{
-			return false;
-		}
-
 		void await_suspend(coroutine_handle<> handle)
 		{
 			callback_function_([handle = std::move(handle)]() mutable { handle.resume(); });
-		}
-
-		void await_resume() noexcept
-		{
 		}
 
 	private:
