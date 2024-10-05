@@ -240,12 +240,12 @@ namespace ucoro
 		template <typename V>
 		void return_value(V &&val) noexcept
 		{
-			value_.emplace<T>(std::forward<V>(val));
+			value_.template emplace<T>(std::forward<V>(val));
 		}
 
 		void unhandled_exception() noexcept
 		{
-			value_.emplace<std::exception_ptr>(std::current_exception());
+			value_.template emplace<std::exception_ptr>(std::current_exception());
 		}
 
 #if defined(DEBUG) || defined(_DEBUG)
