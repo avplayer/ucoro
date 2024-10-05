@@ -17,3 +17,4 @@ if(Qt6_FOUND)
 endif(Qt6_FOUND)
 
 add_subdirectory(test4)
+add_subdirectory(test6)
