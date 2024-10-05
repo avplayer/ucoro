@@ -11,7 +11,7 @@ endif(Boost_FOUND)
 
 add_subdirectory(test3)
 
-find_package(Qt 6.6 COMPONENTS Core)
+find_package(Qt6 6.6 COMPONENTS Core)
 if(Qt6_FOUND)
     add_subdirectory(testqt)
 endif(Qt6_FOUND)
