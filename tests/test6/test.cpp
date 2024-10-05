@@ -14,6 +14,6 @@ ucoro::awaitable<void> coro_compute_exec(int value)
 
 int main(int argc, char **argv)
 {
-	coro_start(coro_compute_exec(10000000));
+	coro_start(coro_compute_exec(10000));
 	return 0;
 }
