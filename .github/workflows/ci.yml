@@ -57,6 +57,11 @@ jobs:
       with:
         version: 6.6.*
 
+    - name: Install libuv and libcurl
+      if: startsWith(runner.os, 'Linux')
+      # 傻逼 ubuntu，好好的 libuv 非要改名 libuv1，脑子得有多秀逗啊
+      run: sudo apt-get install -y libuv1-dev libcurl4-openssl-dev
+
     - name: Build Boost
       id: boost
       uses: egor-tensin/build-boost@v1.4
@@ -72,10 +77,6 @@ jobs:
       shell: bash
       run: |
         echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
-    - name: Install libuv and libcurl
-      if: startsWith(runner.os, 'ubuntu')
-      # 傻逼 ubuntu，好好的 libuv 非要改名 libuv1，脑子得有多秀逗啊
-      run: sudo apt-get install -y libuv1-dev libcurl4-openssl-dev
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
