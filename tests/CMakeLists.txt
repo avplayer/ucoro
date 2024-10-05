@@ -24,3 +24,5 @@ endif()
 if(Qt6_FOUND)
     add_subdirectory(testqt)
 endif(Qt6_FOUND)
+
+add_subdirectory(test4)

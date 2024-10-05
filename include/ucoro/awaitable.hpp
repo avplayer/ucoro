@@ -6,6 +6,7 @@
 #pragma once
 
 #include <concepts>
+#include <variant>
 
 #if defined(__has_include)
 
@@ -239,7 +240,12 @@ namespace ucoro
 		template <typename V>
 		void return_value(V &&val) noexcept
 		{
-			value_ = std::forward<V>(val);
+			value_.emplace<T>(std::forward<V>(val));
+		}
+
+		void unhandled_exception() noexcept
+		{
+			value_.emplace<std::exception_ptr>(std::current_exception());
 		}
 
 #if defined(DEBUG) || defined(_DEBUG)
@@ -261,7 +267,7 @@ namespace ucoro
 			free(ptr);
 		}
 #endif
-		T value_; // 用于存储协程返回的值
+		std::variant<std::exception_ptr, T> value_{ nullptr };
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -281,6 +287,11 @@ namespace ucoro
 		{
 		}
 
+		void unhandled_exception() noexcept
+		{
+			exception_ = std::current_exception();
+		}
+
 #if defined(DEBUG) || defined(_DEBUG)
 		void *operator new(std::size_t size)
 		{
@@ -300,6 +311,7 @@ namespace ucoro
 			free(ptr);
 		}
 #endif
+		std::exception_ptr exception_{ nullptr };
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -366,16 +378,27 @@ namespace ucoro
 		{
 			if constexpr (std::is_void_v<T>)
 			{
+				auto exception = current_coro_handle_.promise().exception_;
+				if (exception)
+				{
+					std::rethrow_exception(exception);
+				}
+
 				current_coro_handle_.destroy();
 				current_coro_handle_ = nullptr;
 			}
 			else
 			{
 				auto ret = std::move(current_coro_handle_.promise().value_);
+				if (std::holds_alternative<std::exception_ptr>(ret))
+				{
+					std::rethrow_exception(std::get<std::exception_ptr>(ret));
+				}
+
 				current_coro_handle_.destroy();
 				current_coro_handle_ = nullptr;
 
-				return ret;
+				return std::get<T>(ret);
 			}
 		}
 
