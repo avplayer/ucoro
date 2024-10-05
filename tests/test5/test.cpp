@@ -10,11 +10,18 @@ ucoro::awaitable<int> coro_compute_int(int value)
 	auto ret = co_await executor_awaitable<int>([value](auto handle) {
 		main_ioc.post([value, handle = std::move(handle)]() mutable {
 			std::this_thread::sleep_for(std::chrono::seconds(0));
-			throw std::bad_alloc{};
 			std::cout << value << " value\n";
+
+			// 这里调用后，重新进入协程框架.
 			handle(value * 100);
 		});
+
+		// 这里 return 后，就出协程框架了.
 	});
+
+
+	// 放这里能抓到
+	throw std::bad_alloc{};
 
 	co_return (value + ret);
 }
