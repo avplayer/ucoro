@@ -73,7 +73,7 @@ jobs:
       run: |
         echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
     - name: Install libuv and libcurl
-      if: ${{runner.os}} == 'ubuntu-latest'
+      if: ${{ runner.os == 'ubuntu-latest' }}
       # 傻逼 ubuntu，好好的 libuv 非要改名 libuv1，脑子得有多秀逗啊
       run: sudo apt-get install -y libuv1-dev libcurl4-openssl-dev
 
