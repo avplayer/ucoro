@@ -6,16 +6,16 @@
 
 #include "curl/curl.h"
 
-ucoro::awaitable<void> async_curl_http_post()
+ucoro::awaitable<void> async_curl_http_post(std::string url)
 {
 	CURLM *curl = co_await ucoro::local_storage_t<CURLM *>{};
 
-	co_await executor_awaitable<void>([curl](std::coroutine_handle<void> continuation)
+	co_await executor_awaitable<void>([curl, url](std::coroutine_handle<void> continuation)
 	{
 		auto http_handle = curl_easy_init();
 
 		/* set the options (I left out a few, you get the point anyway) */
-		curl_easy_setopt(http_handle, CURLOPT_URL, "https://www.google.com/");
+		curl_easy_setopt(http_handle, CURLOPT_URL, url.c_str());
 		curl_easy_setopt(http_handle, CURLOPT_PRIVATE, continuation.address());
 		curl_multi_add_handle(curl, http_handle);
 
@@ -27,29 +27,35 @@ ucoro::awaitable<void> async_curl_http_post()
 	co_return;
 }
 
-ucoro::awaitable<int> coro_compute_int(int value)
+ucoro::awaitable<int> coro_compute_int(std::string url)
 {
-	co_await async_curl_http_post();
+	co_await async_curl_http_post(url);
 
-	co_return (value + 1);
+	co_return url.size();
 }
 
-ucoro::awaitable<void> coro_compute_exec(int value)
+ucoro::awaitable<void> coro_compute_exec(std::string url)
 {
-	auto ret = co_await coro_compute_int(value);
+	auto ret = co_await coro_compute_int(url);
 	std::cout << "return: " << ret << std::endl;
 	co_return;
 }
 
+bool global_exit_loop = false;
+
 ucoro::awaitable<void> coro_compute()
 {
+	static std::string urls[] = {
+		"https://www.google.com",
+		"https://www.github.com",
+		"https://microcai.org",
+	};
 	CURL *curl = co_await ucoro::local_storage_t<CURLM *>{};
-	for (auto i = 0; i < 100; i++)
+	for (auto i = 0; i < 3; i++)
 	{
-		co_await coro_compute_exec(i);
+		co_await coro_compute_exec(urls[i]);
 	}
-
-	curl_easy_cleanup(curl);
+	global_exit_loop = true;
 }
 
 int main(int argc, char **argv)
@@ -67,9 +73,9 @@ int main(int argc, char **argv)
 	int msgs_left = -1;
 	CURLMsg *msg;
 
-	int still_alive = 1;
-	do
+	for(;;)
 	{
+		int still_alive = 1;
 		curl_multi_perform(curl, &still_alive);
 
 		/* !checksrc! disable EQUALSNULL 1 */
@@ -95,13 +101,14 @@ int main(int argc, char **argv)
 				fprintf(stderr, "E: CURLMsg (%d)\n", msg->msg);
 			}
 		}
-		if (still_alive)
-		{
-			curl_multi_wait(curl, NULL, 0, 1000, NULL);
-		}
-	}
-	while (still_alive);
 
+		if (global_exit_loop)
+			break;
+
+		curl_multi_wait(curl, NULL, 0, 1000, NULL);
+	}
+
+	curl_multi_cleanup(curl);
 	curl_global_cleanup();
 	return 0;
 }
