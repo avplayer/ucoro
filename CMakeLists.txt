@@ -11,6 +11,10 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake-modules)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_CXX_STANDARD 20)
 
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    add_compile_options(-foptimize-sibling-calls)
+endif()
+
 add_library(ucoro INTERFACE)
 target_include_directories(ucoro INTERFACE include)
 
