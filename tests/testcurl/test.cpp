@@ -18,6 +18,7 @@ ucoro::awaitable<void> async_curl_http_post(std::string url)
 		curl_easy_setopt(http_handle, CURLOPT_URL, url.c_str());
 		curl_easy_setopt(http_handle, CURLOPT_PRIVATE, continuation.address());
 		curl_multi_add_handle(curl, http_handle);
+		curl_multi_wakeup(curl);
 
 		// NOTE: 记住这个位置，叫 2 号位
 		return;
@@ -50,7 +51,6 @@ ucoro::awaitable<void> coro_compute()
 		"https://www.github.com",
 		"https://microcai.org",
 	};
-	CURL *curl = co_await ucoro::local_storage_t<CURLM *>{};
 	for (auto i = 0; i < 3; i++)
 	{
 		co_await coro_compute_exec(urls[i]);
@@ -85,7 +85,6 @@ int main(int argc, char **argv)
 			{
 				CURL *e = msg->easy_handle;
 				fprintf(stderr, "R: %d - %s\n", msg->data.result, curl_easy_strerror(msg->data.result));
-				curl_multi_remove_handle(curl, e);
 				void * coroutine_handle_address = nullptr;
 				curl_easy_getinfo(e, CURLINFO_PRIVATE, &coroutine_handle_address);
 				if (coroutine_handle_address)
@@ -94,6 +93,7 @@ int main(int argc, char **argv)
 					completion_handle();
 				}
 
+				curl_multi_remove_handle(curl, e);
 				curl_easy_cleanup(e);
 			}
 			else
