@@ -75,7 +75,7 @@ jobs:
     - name: Install libuv and libcurl
       if: ${{runner.os}} == 'ubuntu-latest'
       # 傻逼 ubuntu，好好的 libuv 非要改名 libuv1，脑子得有多秀逗啊
-      run: apt-get install -y libuv1-dev libcurl4-openssl-dev
+      run: sudo apt-get install -y libuv1-dev libcurl4-openssl-dev
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
