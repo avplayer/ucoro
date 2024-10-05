@@ -38,7 +38,7 @@ namespace std
 #include <type_traits>
 
 #if defined(DEBUG) || defined(_DEBUG)
-#if !defined(DISABLE_DEBUG_CORO_STACK)
+#if defined(ENABLE_DEBUG_CORO_STACK)
 
 #define DEBUG_CORO_PROMISE
 
