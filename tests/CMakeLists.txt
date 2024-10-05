@@ -23,4 +23,10 @@ find_package(LibUV)
 
 if (LibUV_FOUND)
     add_subdirectory(testlibuv)
-endif()
+endif(LibUV_FOUND)
+
+find_package(CURL)
+
+if (CURL_FOUND)
+    add_subdirectory(testcurl)
+endif(CURL_FOUND)
