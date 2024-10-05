@@ -542,7 +542,7 @@ namespace ucoro
 
 		void await_suspend(std::coroutine_handle<> handle)
 		{
-			callback_function_([handle = std::move(handle)]() mutable { handle.resume(); });
+			callback_function_(handle);
 		}
 
 	private:
