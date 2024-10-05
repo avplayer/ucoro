@@ -18,7 +18,13 @@ ucoro::awaitable<void> async_curl_http_post()
 		curl_easy_setopt(http_handle, CURLOPT_URL, "https://www.google.com/");
 		curl_easy_setopt(http_handle, CURLOPT_PRIVATE, continuation.address());
 		curl_multi_add_handle(curl, http_handle);
+
+		// NOTE: 记住这个位置，叫 2 号位
+		return;
 	});
+
+	// NOTE: 记住这个位置，叫 1 号位
+	co_return;
 }
 
 ucoro::awaitable<int> coro_compute_int(int value)
@@ -55,6 +61,8 @@ int main(int argc, char **argv)
 	{
 		coro_start(coro_compute(), curl);
 	}
+
+	// 注意这里，执行到这里的时候，上诉 NOTE 里的 2号位代码执行完毕，return 了。1号位的代码，尚未执行到。
 
 	int msgs_left = -1;
 	CURLMsg *msg;
