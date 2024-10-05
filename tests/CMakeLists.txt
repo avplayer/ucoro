@@ -3,12 +3,7 @@ set_target_properties(ucoro_tests PROPERTIES FOLDER "ucoro_tests")
 
 add_subdirectory(test1)
 
-if(CMAKE_VERSION VERSION_LESS "3.30")
-    find_package(Boost 1.60 COMPONENTS thread system)
-else()
-    find_package(Boost 1.60 CONFIG)
-endif()
-
+find_package(Boost 1.60 COMPONENTS thread system)
 if(Boost_FOUND)
     add_subdirectory(test2)
     add_subdirectory(test5)
