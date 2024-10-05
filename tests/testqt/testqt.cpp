@@ -10,7 +10,6 @@ ucoro::awaitable<int> coro_compute_int(int value)
 {
 	auto ret = co_await executor_awaitable<int>([value](auto handle) {
 		QTimer::singleShot(0, [value, handle = std::move(handle)]() mutable {
-			std::this_thread::sleep_for(std::chrono::seconds(0));
 			std::cout << value << " value\n";
 			handle(value * 100);
 		});
