@@ -177,10 +177,6 @@ namespace ucoro
 			return std::suspend_always{};
 		}
 
-		void unhandled_exception()
-		{
-		}
-
 		template <typename A>
 			requires(detail::is_awaiter_v<A>)
 		auto await_transform(A awaiter) const
