@@ -38,9 +38,16 @@ namespace std
 #include <type_traits>
 
 #if defined(DEBUG) || defined(_DEBUG)
+#if !defined(DISABLE_DEBUG_CORO_STACK)
+
+#define DEBUG_CORO_PROMISE
+
 #include <unordered_set>
-inline std::unordered_set<void *> debug_coro_count;
+inline std::unordered_set<void*> debug_coro_count;
+
 #endif
+#endif
+
 
 namespace ucoro
 {
@@ -84,10 +91,38 @@ namespace ucoro
 		};
 	} // namespace detail
 
+#if defined(DEBUG_CORO_PROMISE)
+
+	struct debug_coro_promise
+	{
+		void* operator new(std::size_t size)
+		{
+			void* ptr = malloc(size);
+			if (!ptr)
+			{
+				throw std::bad_alloc{};
+			}
+			debug_coro_count.insert(ptr);
+			return ptr;
+		}
+
+		void operator delete(void* ptr, std::size_t size)
+		{
+			debug_coro_count.erase(ptr);
+			(void)size;
+			free(ptr);
+		}
+	};
+
+#endif // DEBUG_CORO_PROMISE
+
 	//////////////////////////////////////////////////////////////////////////
 	struct awaitable_detached
 	{
 		struct promise_type
+#ifdef DEBUG_CORO_PROMISE
+			: public debug_coro_promise
+#endif // DEBUG_CORO_PROMISE
 		{
 			std::suspend_never initial_suspend() noexcept
 			{
@@ -111,26 +146,6 @@ namespace ucoro
 			{
 				return awaitable_detached();
 			}
-
-#if defined(DEBUG) || defined(_DEBUG)
-			void *operator new(std::size_t size)
-			{
-				void *ptr = malloc(size);
-				if (!ptr)
-				{
-					throw std::bad_alloc{};
-				}
-				debug_coro_count.insert(ptr);
-				return ptr;
-			}
-
-			void operator delete(void *ptr, std::size_t size)
-			{
-				debug_coro_count.erase(ptr);
-				(void)size;
-				free(ptr);
-			}
-#endif
 		};
 	};
 
@@ -153,6 +168,9 @@ namespace ucoro
 	//
 
 	struct awaitable_promise_base
+#ifdef DEBUG_CORO_PROMISE
+		: public debug_coro_promise
+#endif // DEBUG_CORO_PROMISE
 	{
 		auto initial_suspend()
 		{
@@ -248,25 +266,6 @@ namespace ucoro
 			value_.template emplace<std::exception_ptr>(std::current_exception());
 		}
 
-#if defined(DEBUG) || defined(_DEBUG)
-		void *operator new(std::size_t size)
-		{
-			void *ptr = malloc(size);
-			if (!ptr)
-			{
-				throw std::bad_alloc{};
-			}
-			debug_coro_count.insert(ptr);
-			return ptr;
-		}
-
-		void operator delete(void *ptr, std::size_t size)
-		{
-			debug_coro_count.erase(ptr);
-			(void)size;
-			free(ptr);
-		}
-#endif
 		std::variant<std::exception_ptr, T> value_{ nullptr };
 	};
 
@@ -292,25 +291,6 @@ namespace ucoro
 			exception_ = std::current_exception();
 		}
 
-#if defined(DEBUG) || defined(_DEBUG)
-		void *operator new(std::size_t size)
-		{
-			void *ptr = malloc(size);
-			if (!ptr)
-			{
-				throw std::bad_alloc{};
-			}
-			debug_coro_count.insert(ptr);
-			return ptr;
-		}
-
-		void operator delete(void *ptr, std::size_t size)
-		{
-			debug_coro_count.erase(ptr);
-			(void)size;
-			free(ptr);
-		}
-#endif
 		std::exception_ptr exception_{ nullptr };
 	};
 
