@@ -62,7 +62,7 @@ jobs:
       uses: egor-tensin/build-boost@v1.4
       with:
         version: 1.86.0
-        libraries: system thread
+        libraries: system thread atomic
         platform: x64
         configuration: Release
 
