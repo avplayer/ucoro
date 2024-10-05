@@ -18,3 +18,9 @@ endif(Qt6_FOUND)
 
 add_subdirectory(test4)
 add_subdirectory(test6)
+
+find_package(LibUV)
+
+if (LibUV_FOUND)
+    add_subdirectory(testlibuv)
+endif()
