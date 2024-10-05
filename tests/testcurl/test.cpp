@@ -69,10 +69,8 @@ int main(int argc, char **argv)
 		{
 			if (msg->msg == CURLMSG_DONE)
 			{
-				char *url;
 				CURL *e = msg->easy_handle;
-				curl_easy_getinfo(msg->easy_handle, CURLINFO_PRIVATE, &url);
-				fprintf(stderr, "R: %d - %s <%s>\n", msg->data.result, curl_easy_strerror(msg->data.result), url);
+				fprintf(stderr, "R: %d - %s\n", msg->data.result, curl_easy_strerror(msg->data.result));
 				curl_multi_remove_handle(curl, e);
 				void * coroutine_handle_address = nullptr;
 				curl_easy_getinfo(e, CURLINFO_PRIVATE, &coroutine_handle_address);
