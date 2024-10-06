@@ -1,5 +1,4 @@
 #include <iostream>
-#define DISABLE_DEBUG_CORO_STACK
 #include "ucoro/awaitable.hpp"
 
 #include "uv.h"

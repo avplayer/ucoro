@@ -1,7 +1,6 @@
 #include <future>
 #include <iostream>
 #include <thread>
-#define DISABLE_DEBUG_CORO_STACK
 #include "ucoro/awaitable.hpp"
 
 #include "curl/curl.h"
