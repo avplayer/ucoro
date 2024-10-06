@@ -37,12 +37,12 @@ namespace std
 #include <type_traits>
 
 #if defined(DEBUG) || defined(_DEBUG)
-#if defined(ENABLE_DEBUG_CORO_STACK)
+#if defined(ENABLE_DEBUG_CORO_LEAK)
 
-#define DEBUG_CORO_PROMISE
+#define DEBUG_CORO_PROMISE_LEAK
 
 #include <unordered_set>
-inline std::unordered_set<void*> debug_coro_count;
+inline std::unordered_set<void*> debug_coro_leak;
 
 #endif
 #endif
@@ -84,7 +84,7 @@ namespace ucoro
 		};
 	} // namespace detail
 
-#if defined(DEBUG_CORO_PROMISE)
+#if defined(DEBUG_CORO_PROMISE_LEAK)
 
 	struct debug_coro_promise
 	{
@@ -95,26 +95,26 @@ namespace ucoro
 			{
 				throw std::bad_alloc{};
 			}
-			debug_coro_count.insert(ptr);
+			debug_coro_leak.insert(ptr);
 			return ptr;
 		}
 
 		void operator delete(void* ptr, [[maybe_unused]] std::size_t size)
 		{
-			debug_coro_count.erase(ptr);
+			debug_coro_leak.erase(ptr);
 			free(ptr);
 		}
 	};
 
-#endif // DEBUG_CORO_PROMISE
+#endif // DEBUG_CORO_PROMISE_LEAK
 
 	//////////////////////////////////////////////////////////////////////////
 	struct awaitable_detached
 	{
 		struct promise_type
-#ifdef DEBUG_CORO_PROMISE
+#ifdef DEBUG_CORO_PROMISE_LEAK
 			: public debug_coro_promise
-#endif // DEBUG_CORO_PROMISE
+#endif // DEBUG_CORO_PROMISE_LEAK
 		{
 			std::suspend_never initial_suspend() noexcept
 			{
@@ -160,9 +160,9 @@ namespace ucoro
 	//
 
 	struct awaitable_promise_base
-#ifdef DEBUG_CORO_PROMISE
+#ifdef DEBUG_CORO_PROMISE_LEAK
 		: public debug_coro_promise
-#endif // DEBUG_CORO_PROMISE
+#endif // DEBUG_CORO_PROMISE_LEAK
 	{
 		auto initial_suspend()
 		{
