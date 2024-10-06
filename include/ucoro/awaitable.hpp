@@ -180,7 +180,7 @@ namespace ucoro
 			{
 				awaitable_promise_base *this_;
 
-				bool await_ready() const noexcept
+				constexpr bool await_ready() const noexcept
 				{
 					return true;
 				}
@@ -205,7 +205,7 @@ namespace ucoro
 			{
 				awaitable_promise_base *this_;
 
-				bool await_ready() const noexcept
+				constexpr bool await_ready() const noexcept
 				{
 					return true;
 				}
@@ -335,7 +335,7 @@ namespace ucoro
 			}
 		}
 
-		bool await_ready() const noexcept
+		constexpr bool await_ready() const noexcept
 		{
 			return false;
 		}
@@ -437,7 +437,7 @@ namespace ucoro
 		{
 		}
 
-		bool await_ready() noexcept
+		constexpr bool await_ready() noexcept
 		{
 			return false;
 		}
@@ -467,7 +467,7 @@ namespace ucoro
 		{
 		}
 
-		bool await_ready() noexcept
+		constexpr bool await_ready() noexcept
 		{
 			return false;
 		}
@@ -497,7 +497,7 @@ namespace ucoro
 		{
 		}
 
-		bool await_ready() noexcept
+		constexpr bool await_ready() noexcept
 		{
 			return false;
 		}
