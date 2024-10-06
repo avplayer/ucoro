@@ -24,53 +24,43 @@ struct awaitable_return_value<void>
 	}
 };
 
-
-template <typename T> requires (!std::is_same_v<T, void>)
-auto  transform_asio_awaitable(boost::asio::awaitable<T>&& asio_awaitable)
-{
-	struct asio_awaitable_awiter : public awaitable_return_value<T>
-	{
-		asio_awaitable_awiter(boost::asio::awaitable<T>&& asio_awaitable) : asio_awaitable(std::move(asio_awaitable)){};
-
-		constexpr auto await_ready() { return false; }
-
-		auto await_suspend(std::coroutine_handle<> continue_handle)
-		{
-			boost::asio::co_spawn(main_ioc, [this](auto continue_handle) -> boost::asio::awaitable<void>
-			{
-				if constexpr (!std::is_void_v<T>)
-				{
-					this->return_value = co_await std::move(asio_awaitable);
-				}
-				else
-				{
-					co_await std::move(asio_awaitable);
-				}
-
-				continue_handle.resume();
-				co_return ;
-			}(continue_handle), [](std::exception_ptr){});
-		}
-
-		boost::asio::awaitable<T> asio_awaitable;
-	};
-	return asio_awaitable_awiter { std::move(asio_awaitable) };
-}
-
-
-namespace ucoro
-{
-
 template <typename T>
-struct await_transformer<boost::asio::awaitable<T>>
+struct asio_awaitable_awaiter : public awaitable_return_value<T>
 {
-	static auto await_transform(boost::asio::awaitable<T>&& awaitee)
+	asio_awaitable_awaiter(boost::asio::awaitable<T>&& asio_awaitable) : asio_awaitable(std::move(asio_awaitable)){};
+
+	constexpr auto await_ready() { return false; }
+
+	auto await_suspend(std::coroutine_handle<> continue_handle)
 	{
-		return transform_asio_awaitable(std::move(awaitee));
+		// auto executor = boost::asio::get_associated_executor(asio_awaitable, main_ioc)
+		boost::asio::co_spawn(main_ioc, [this](auto continue_handle) -> boost::asio::awaitable<void>
+		{
+			if constexpr (!std::is_void_v<T>)
+			{
+				this->return_value = co_await std::move(asio_awaitable);
+			}
+			else
+			{
+				co_await std::move(asio_awaitable);
+			}
+
+			continue_handle.resume();
+			co_return ;
+		}(continue_handle), [](std::exception_ptr){});
 	}
+
+	boost::asio::awaitable<T> asio_awaitable;
 };
 
-}
+template <typename T>
+struct ucoro::await_transformer<boost::asio::awaitable<T>>
+{
+	static auto await_transform(boost::asio::awaitable<T>&& asio_awaitable)
+	{
+		return asio_awaitable_awaiter { std::move(asio_awaitable) };
+	}
+};
 
 boost::asio::awaitable<int> asio_coro_test()
 {
