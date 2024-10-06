@@ -30,3 +30,9 @@ find_package(CURL)
 if (CURL_FOUND)
     add_subdirectory(testcurl)
 endif(CURL_FOUND)
+
+find_package(Libevent)
+
+if (LIBEVENT_FOUND)
+    add_subdirectory(testlibevent)
+endif(LIBEVENT_FOUND)
