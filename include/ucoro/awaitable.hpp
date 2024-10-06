@@ -171,14 +171,14 @@ namespace ucoro
 		}
 
 		template <typename A>
-			requires(detail::is_awaiter_v<A>)
-		auto await_transform(A awaiter) const
+			requires(detail::is_awaiter_v<std::decay_t<A>>)
+		auto await_transform(A&& awaiter) const
 		{
-			return awaiter;
+			return std::move(awaiter);
 		}
 
 		template <typename A>
-			requires(!detail::is_awaiter_v<A>)
+			requires(!detail::is_awaiter_v<std::decay_t<A>>)
 		auto await_transform(A&& awaiter) const
 		{
 			return await_transformer<A>::await_transform(std::move(awaiter));
@@ -330,7 +330,9 @@ namespace ucoro
 		}
 
 		awaitable(const awaitable &) = delete;
+		awaitable(awaitable &) = delete;
 		awaitable &operator=(const awaitable &) = delete;
+		awaitable &operator=(awaitable &) = delete;
 
 		T operator()()
 		{
