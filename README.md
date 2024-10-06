@@ -253,7 +253,7 @@ ucoro::awaitable<int> test_coro_called_by_asio_coro(int value)
 
 boost::asio::awaitable<int> asio_coro_test()
 {
-	co_return co_await ucoro::asio_glue::to_asio_awaitable(test_coro_called_by_asio_coro(2333));
+    co_return co_await ucoro::asio_glue::to_asio_awaitable(test_coro_called_by_asio_coro(2333));
 }
 
 ucoro::awaitable<int> test_coro(int value)
@@ -266,9 +266,9 @@ ucoro::awaitable<int> test_coro(int value)
 int main(int argc, char **argv)
 {
     boost::asio::io_context main_ioc;
-	coro_start(test_coro(), &main_ioc);
-	main_ioc.run();
-	return 0;
+    coro_start(test_coro(), &main_ioc);
+    main_ioc.run();
+    return 0;
 }
 
 ```
