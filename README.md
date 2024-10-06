@@ -191,3 +191,6 @@ awaitable<void> some_work_on_qsocket()
 
 ```
 
+# 即时交流群
+
+可以加入 Telegram 群 [µcoro讨论群](https://t.me/ucorogroup/5) 讨论 µcoro
