@@ -27,7 +27,9 @@ ucoro::awaitable<void> coro_compute_exec(int value)
 		std::cout << e.what();
 	}
 
-	auto ret = co_await coro_compute_int(value);
+	auto comput_promise = coro_compute_int(value);
+
+	auto ret = co_await comput_promise;
 	std::cout << "return: " << ret << std::endl;
 	co_return;
 }
