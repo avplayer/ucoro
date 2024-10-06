@@ -36,3 +36,5 @@ find_package(Libevent)
 if (LIBEVENT_FOUND)
     add_subdirectory(testlibevent)
 endif(LIBEVENT_FOUND)
+
+add_subdirectory(test_executor)
