@@ -57,10 +57,10 @@ jobs:
       with:
         version: 6.6.*
 
-    - name: Install libuv and libcurl
+    - name: Install libuv and libcurl and libevent
       if: startsWith(runner.os, 'Linux')
       # 傻逼 ubuntu，好好的 libuv 非要改名 libuv1，脑子得有多秀逗啊
-      run: sudo apt-get install -y libuv1-dev libcurl4-openssl-dev
+      run: sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libevent-dev
 
     - name: Build Boost
       id: boost
