@@ -31,6 +31,7 @@ namespace std
 #endif
 
 #include <any>
+#include <cstdlib>
 #include <cassert>
 #include <functional>
 #include <memory>
@@ -90,7 +91,7 @@ namespace ucoro
 	{
 		void* operator new(std::size_t size)
 		{
-			void* ptr = malloc(size);
+			void* ptr = std::malloc(size);
 			if (!ptr)
 			{
 				throw std::bad_alloc{};
@@ -102,7 +103,7 @@ namespace ucoro
 		void operator delete(void* ptr, [[maybe_unused]] std::size_t size)
 		{
 			debug_coro_leak.erase(ptr);
-			free(ptr);
+			std::free(ptr);
 		}
 	};
 
