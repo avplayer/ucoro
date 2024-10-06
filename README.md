@@ -191,6 +191,96 @@ awaitable<void> some_work_on_qsocket()
 
 ```
 
+# 高级进阶：兼容其他c++20协程库
+
+所谓兼容，有两层含义。其一是可以在 uroco::awaitable 的环境里， co_await 其他协程库的awaitable.
+其二，则是可以在其他协程库的协程里， co_await ucoro::awaitable 的协程对象。
+
+## 兼容 boost::asio::awaitable<>
+
+使用的时候，只要
+
+```cpp
+#include <ucoro/asio_glue.hpp>
+```
+
+
+并且使用的时候，要将你用到的 asio 的 io_context 的指针 ( boost::asio::io_context\* )设置为 协程本地存储
+```c++
+ start_coro( your_coroutine(), & io_context );
+```
+
+这样启动的协程，里面就可以 co_await 一个 asio::awaitable<> 对象了。比如
+
+```cpp
+boost::asio::awaitable<int> asio_coro_test()
+{
+	co_return 2333;
+}
+
+ucoro::awaitable<int> test_coro(int value)
+{
+    auto asio_coro_ret = co_await asio_coro_test();
+
+    co_return asio_coro_test* value;
+}
+
+int main(int argc, char **argv)
+{
+    boost::asio::io_context main_ioc;
+	coro_start(test_coro(), &main_ioc);
+	main_ioc.run();
+	return 0;
+}
+
+```
+
+这个例子里， test_coro 是 ucoro  协程，而 asio_coro_test 则是 asio 定义的协程。
+
+如果反过来呢？
+
+反过来只要调用 ```ucoro::asio_glue::to_asio_awaitable``` 即可。
+
+例如这个例子
+
+
+```c++
+
+ucoro::awaitable<int> test_coro_called_by_asio_coro(int value)
+{
+    co_return value;
+}
+
+boost::asio::awaitable<int> asio_coro_test()
+{
+	co_return co_await ucoro::asio_glue::to_asio_awaitable(test_coro_called_by_asio_coro(2333));
+}
+
+ucoro::awaitable<int> test_coro(int value)
+{
+    auto asio_coro_ret = co_await asio_coro_test();
+
+    co_return asio_coro_test* value;
+}
+
+int main(int argc, char **argv)
+{
+    boost::asio::io_context main_ioc;
+	coro_start(test_coro(), &main_ioc);
+	main_ioc.run();
+	return 0;
+}
+
+```
+
+这个例子里， test_coro_called_by_asio_coro 是一个 ucoro 协程，但是被 一个 asio 协程调用。
+但是因为 asio 的协程内部实现无法修改，因此无法直接 co_await , 而是需要经过
+```
+ucoro::asio_glue::to_asio_awaitable
+```
+这个函数进行一次包装。包装后，它返回的对象就可以在 asio协程里 co_await.
+
+
 # 即时交流群
 
 可以加入 Telegram 群 [µcoro讨论群](https://t.me/ucorogroup/5) 讨论 µcoro
