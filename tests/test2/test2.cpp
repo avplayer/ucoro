@@ -62,30 +62,25 @@ struct ucoro::await_transformer<boost::asio::awaitable<T>>
 	}
 };
 
-// boost::asio::awaitable<int> operator co_await(ucoro::awaitable<int>&&)
-// {
-// 	return []() ->boost::asio::awaitable<int> { co_return 0; }();
-// }
-
-ucoro::awaitable<int> called_from_asio_coro()
-{
-	co_return 10;
-}
-
 struct initiate_do_invoke_ucoro_awaitable
 {
 	template <typename T, typename Handler> requires (!std::is_void_v<T>)
 	void operator()(Handler&& handler, ucoro::awaitable<T> *ucoro_awaitable) const
 	{
-		auto executor = boost::asio::get_associated_executor(handler);
-
-
 		[handler = std::move(handler), ucoro_awaitable = std::move(*ucoro_awaitable)]() mutable -> ucoro::awaitable<void>
 		{
 			auto return_value = co_await std::move(ucoro_awaitable);
-
 			handler(boost::system::error_code(), return_value);
-			co_return;
+		}().detach();
+	}
+
+	template <typename Handler>
+	void operator()(Handler&& handler, ucoro::awaitable<void> *ucoro_awaitable) const
+	{
+		[handler = std::move(handler), ucoro_awaitable = std::move(*ucoro_awaitable)]() mutable -> ucoro::awaitable<void>
+		{
+			co_await std::move(ucoro_awaitable);
+			handler(boost::system::error_code());
 		}().detach();
 	}
 };
@@ -96,6 +91,11 @@ auto ucoro_awaitable_to_asio_awaitable(ucoro::awaitable<T> && ucoro_awaitable)
 	return boost::asio::async_initiate<decltype(boost::asio::use_awaitable),
 	void(boost::system::error_code, T)>(
 		initiate_do_invoke_ucoro_awaitable(), boost::asio::use_awaitable, &ucoro_awaitable);
+}
+
+ucoro::awaitable<int> called_from_asio_coro()
+{
+	co_return 10;
 }
 
 boost::asio::awaitable<int> asio_coro_test()
