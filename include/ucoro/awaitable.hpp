@@ -85,10 +85,10 @@ namespace ucoro
 		};
 	} // namespace detail
 
-#if defined(DEBUG_CORO_PROMISE_LEAK)
-
 	struct debug_coro_promise
 	{
+#if defined(DEBUG_CORO_PROMISE_LEAK)
+
 		void* operator new(std::size_t size)
 		{
 			void* ptr = std::malloc(size);
@@ -105,17 +105,16 @@ namespace ucoro
 			debug_coro_leak.erase(ptr);
 			std::free(ptr);
 		}
-	};
 
 #endif // DEBUG_CORO_PROMISE_LEAK
+	};
+
 
 	//////////////////////////////////////////////////////////////////////////
 	struct awaitable_detached
 	{
 		struct promise_type
-#ifdef DEBUG_CORO_PROMISE_LEAK
 			: public debug_coro_promise
-#endif // DEBUG_CORO_PROMISE_LEAK
 		{
 			std::suspend_never initial_suspend() noexcept
 			{
@@ -161,9 +160,7 @@ namespace ucoro
 	//
 
 	struct awaitable_promise_base
-#ifdef DEBUG_CORO_PROMISE_LEAK
 		: public debug_coro_promise
-#endif // DEBUG_CORO_PROMISE_LEAK
 	{
 		auto initial_suspend()
 		{
