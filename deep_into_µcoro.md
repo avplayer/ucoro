@@ -266,6 +266,19 @@ int main()
 
 由于一个协程是一个闭包，它需要有一个上下文环境来存储中间状态。这个上下文环境就是 promsie。
 
+对于一个
+```c++
+T mycoro()
+{
+	co_await ...
+}
+```
+这样的一个函数， mycoro 的上下文环境其实就是 T::promise_type,
+- 它创建的时候， 会调用 if (! T::promsie_type::await_ready() ) T::promsie_type::initial_suspend
+- 它内部使用 co_await 的时候，调用的是 T::promsie_type::await_transform 。
+- 它返回的时候，会调用 T::promsie_type::await_transform::final_suspend
+
+
 对于 ```ucoro::awaitable<int> B()``` 这样的函数，其上下文环境就存储在 ```ucoro::awaitalbe<int>::promise_type``` 里。
 
 如果在 A() 函数代码里使用 co_await B(); 这样的表达式，意味着编译器会调用 ucoro::awaitalbe<int> 这个 awaiter。

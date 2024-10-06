@@ -54,7 +54,7 @@ ucoro::awaitable<void> do_calc()
 }
 ```
 
->注意，返回值为 awaitable<void> 的情况下， co_return 可以省去。前提是函数内部必须包含 co_await 指令。也就是说，函数内部必须至少有一个 co_return/co_await。
+>注意，返回值为 ```awaitable<void>``` 的情况下， co_return 可以省去。前提是函数内部必须包含 co_await 指令。也就是说，函数内部必须至少有一个 co_return/co_await。
 
 而调用 do_calc() 的代码，则从
 
@@ -78,7 +78,7 @@ int main()
 
 # 进阶：修改异步回调为 co_await
 
-刚刚展示的用法，实际上协程只是作为一直新的执行序列转移方法。本身其实并没有将任务转变为异步任务。
+刚刚展示的用法，实际上协程只是作为一种新的执行序列转移方法。本身其实并没有将任务转变为异步任务。
 
 实际上，使用协程最大的目的，是为了以编写同步模式IO的思维去实际上让代码运行于异步IO模式。
 
@@ -128,12 +128,12 @@ async_qtimer_shot 只要使用 executor_awaitable 对 QTimer::singleShot 进行�
 ```cpp
 awaitable<void> async_qtimer_shot(int ms)
 {
-	co_await executor_awaitable<void>([ms](auto continuation) {
-		QTimer::singleShot(ms, [continuation = std::move(continuation)]() mutable
+    co_await executor_awaitable<void>([ms](auto continuation) {
+        QTimer::singleShot(ms, [continuation = std::move(continuation)]() mutable
         {
 			continuation();
-		});
-	});
+        });
+    });
     co_return;
 }
 
@@ -153,7 +153,7 @@ awaitable<int> async_read_qsocket(QTcpSocket* s, void* buffer, int buffer_size)
     auto read_size = co_await executor_awaitable<int>([&context, s, buffer, buffers_size](auto continuation)
     {
         QObject::connect(s, &QIODevice::readyRead, context,
-            [s, &context, buffer, buffers_size]()
+            [s, &context, buffer, buffers_size]() mutable
             {
                 // context 没了，信号和槽自动解绑。
                 // 其实用这个是为了实现一次性 信号连接
