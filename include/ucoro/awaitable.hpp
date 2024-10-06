@@ -99,10 +99,9 @@ namespace ucoro
 			return ptr;
 		}
 
-		void operator delete(void* ptr, std::size_t size)
+		void operator delete(void* ptr, [[maybe_unused]] std::size_t size)
 		{
 			debug_coro_count.erase(ptr);
-			(void)size;
 			free(ptr);
 		}
 	};
