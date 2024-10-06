@@ -266,7 +266,7 @@ ucoro::awaitable<int> test_coro(int value)
 int main(int argc, char **argv)
 {
     boost::asio::io_context main_ioc;
-    coro_start(test_coro(), &main_ioc);
+    coro_start(test_coro(101), &main_ioc);
     main_ioc.run();
     return 0;
 }
