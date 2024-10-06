@@ -12,7 +12,6 @@
 
 #if __has_include(<coroutine>)
 #include <coroutine>
-#define UCORO_HAS_STD_COROUTINE
 #else
 #include <experimental/coroutine>
 namespace std
