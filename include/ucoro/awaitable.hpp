@@ -52,6 +52,9 @@ inline std::unordered_set<void*> debug_coro_leak;
 namespace ucoro
 {
 	template <typename T>
+	struct await_transformer;
+
+	template <typename T>
 	struct awaitable;
 
 	template <typename T>
@@ -172,6 +175,13 @@ namespace ucoro
 		auto await_transform(A awaiter) const
 		{
 			return awaiter;
+		}
+
+		template <typename A>
+			requires(!detail::is_awaiter_v<A>)
+		auto await_transform(A&& awaiter) const
+		{
+			return await_transformer<A>::await_transform(std::move(awaiter));
 		}
 
 		auto await_transform(local_storage_t<void>) noexcept
