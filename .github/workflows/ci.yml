@@ -62,6 +62,13 @@ jobs:
       # 傻逼 ubuntu，好好的 libuv 非要改名 libuv1，脑子得有多秀逗啊
       run: sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libevent-dev
 
+    - name: cache boost build
+      id: cache-boost-build
+      uses: actions/cache@v4
+      with:
+        path: boost
+        key: ${{ runner.os }}-boost-build
+
     - name: Build Boost
       id: boost
       uses: egor-tensin/build-boost@v1.4
