@@ -49,7 +49,9 @@ jobs:
     - name: setup variables
       shell: bash
       run: |
-        WORKDIR=`realpath "${{ github.workspace }}/.."`
+        WORKDIR=$(realpath "${{ github.workspace }}/..")
+        pwd
+        realpath "${{ github.workspace }}/.."
         echo "WORKDIR=${WORKDIR}" >> $GITHUB_ENV
 
     - uses: actions/checkout@v4
@@ -90,7 +92,7 @@ jobs:
       id: strings
       shell: bash
       run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> $GITHUB_ENV
+        echo "build-output-dir=${{ github.workspace }}/build" >> $BOOST_LIBRARYDIR
         echo "BOOST_ROOT=${{ github.workspace }}/../boost" >> $GITHUB_ENV
         echo "BOOST_LIBRARYDIR=${{ github.workspace }}/../boost/stage/x64/Release/lib" >> $GITHUB_ENV
 
