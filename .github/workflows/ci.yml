@@ -47,10 +47,8 @@ jobs:
 
     steps:
     - name: setup variables
-      shell: bash
       id: workset
       run: |
-        WORKDIR=$(realpath "${{ github.workspace }}/..")
         pwd
         cd ..
         pwd
