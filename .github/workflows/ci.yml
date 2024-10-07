@@ -46,6 +46,12 @@ jobs:
             c_compiler: cl
 
     steps:
+    - name: setup variables
+      shell: bash
+      run: |
+        WORKDIR=`realpath "${{ github.workspace }}/.."`
+        echo "WORKDIR=${WORKDIR}" >> $GITHUB_ENV
+
     - uses: actions/checkout@v4
     - name: Install ninja-build tool
       uses: seanmiddleditch/gha-setup-ninja@v5
@@ -66,14 +72,8 @@ jobs:
       id: cache-boost-build
       uses: actions/cache@v4
       with:
-        path: ${{ github.workspace }}/../boost
+        path: ${{ env.WORKDIR }}/boost
         key: ${{ runner.os }}-boost-build
-
-    - name: use Cached boost
-      if: steps.cache-boost-build.outputs.cache-hit == 'true'
-      run: |
-        echo "BOOST_ROOT=${{ github.workspace }}/../boost" >> "$BOOST_ROOT"
-        echo "BOOST_LIBRARYDIR=${{ github.workspace }}/../boost/stage/x64/Release/lib" >> "$BOOST_LIBRARYDIR"
 
     - name: Build Boost
       id: boost
@@ -90,7 +90,9 @@ jobs:
       id: strings
       shell: bash
       run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
+        echo "build-output-dir=${{ github.workspace }}/build" >> $GITHUB_ENV
+        echo "BOOST_ROOT=${{ github.workspace }}/../boost" >> $GITHUB_ENV
+        echo "BOOST_LIBRARYDIR=${{ github.workspace }}/../boost/stage/x64/Release/lib" >> $GITHUB_ENV
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
@@ -101,6 +103,8 @@ jobs:
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
+        -D "BOOST_ROOT=${{ env.BOOST_ROOT }}"
+        -D "BOOST_LIBRARYDIR=${{ env.BOOST_LIBRARYDIR }}"
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
