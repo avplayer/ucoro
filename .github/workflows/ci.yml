@@ -52,9 +52,8 @@ jobs:
         pwd
         cd ..
         pwd
-        WORKDIR=`pwd`
-        echo "WORKDIR=${WORKDIR}" >> $GITHUB_ENV
-        echo "workdir=${WORKDIR}" >> $GITHUB_OUTPUT
+        echo "WORKDIR=$(pwd)" >> $GITHUB_ENV
+        echo "workdir=$(pwd)" >> $GITHUB_OUTPUT
 
     - uses: actions/checkout@v4
     - name: Install ninja-build tool
