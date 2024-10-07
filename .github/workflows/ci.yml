@@ -78,7 +78,7 @@ jobs:
 
     - name: cache boost build
       id: cache-boost-build
-      uses: actions/cache@v4
+      uses: actions/cache@v4.1.0
       with:
         path: ${{ steps.workset.outputs.boostdir }}
         key: ${{ runner.os }}-boost-build
