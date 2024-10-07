@@ -82,7 +82,7 @@ jobs:
       uses: actions/cache@v4.1.0
       with:
         lookup-only: false
-        path: "${{ env.BOOST_ROOT }}"
+        path: ${{ env.BOOST_ROOT }}/
         key: ${{ runner.os }}-boost-build
 
     - name: Build Boost
