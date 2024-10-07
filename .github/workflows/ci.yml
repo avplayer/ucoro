@@ -79,12 +79,13 @@ jobs:
 
     - name: cache boost build
       id: cache-boost-build
-      if: startsWith(runner.os, 'Linux')
       uses: actions/cache@v4.1.0
       with:
         lookup-only: false
         path: ${{ env.BOOST_ROOT }}/
         key: ${{ runner.os }}-boost-build
+      env:
+        BOOST_ROOT: ${{ steps.workset.outputs.boostdir }}
 
     - name: Build Boost
       id: boost
