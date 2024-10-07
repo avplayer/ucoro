@@ -46,21 +46,6 @@ jobs:
             c_compiler: cl
 
     steps:
-    - name: setup variables
-      id: workset
-      run: |
-        pwd
-        cd ..
-        pwd
-        echo "WORKDIR=$(pwd)" >> $GITHUB_ENV
-        echo "workdir=$(pwd)" >> $GITHUB_OUTPUT
-        mkdir boost
-        cd boost
-        echo "boostdir=$(pwd)" >> $GITHUB_OUTPUT
-        echo "BOOST_ROOT=$(pwd)" >> $GITHUB_ENV
-        cd ..
-        rm -r boost
-
     - uses: actions/checkout@v4
     - name: Install ninja-build tool
       uses: seanmiddleditch/gha-setup-ninja@v5
@@ -82,7 +67,7 @@ jobs:
       uses: actions/cache@v4.1.0
       with:
         lookup-only: false
-        path: ${{ env.BOOST_ROOT }}/
+        path: ${{ runner.workspace }}/boost
         key: ${{ runner.os }}-boost-build
       env:
         BOOST_ROOT: ${{ steps.workset.outputs.boostdir }}
@@ -103,10 +88,10 @@ jobs:
       shell: bash
       run: |
         echo "build-output-dir=${{ github.workspace }}/build" >> $GITHUB_OUTPUT
-        echo "boost_root=${{ steps.workset.outputs.boostdir }}" >> $GITHUB_OUTPUT
-        echo "boost_libs=${{ steps.workset.outputs.boostdir }}/stage/x64/Release/lib" >> $GITHUB_OUTPUT
-        echo "BOOST_ROOT=${{ steps.workset.outputs.boostdir }}" >> $GITHUB_ENV
-        echo "BOOST_LIBRARYDIR=${{ steps.workset.outputs.boostdir }}/stage/x64/Release/lib" >> $GITHUB_ENV
+        echo "boost_root=${{ runner.workspace }}/boost" >> $GITHUB_OUTPUT
+        echo "boost_libs=${{ runner.workspace }}/boost/stage/x64/Release/lib" >> $GITHUB_OUTPUT
+        echo "BOOST_ROOT=${{ runner.workspace }}/boost" >> $GITHUB_ENV
+        echo "BOOST_LIBRARYDIR=${{ runner.workspace }}/boost/stage/x64/Release/lib" >> $GITHUB_ENV
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
