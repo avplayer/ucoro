@@ -64,6 +64,13 @@ jobs:
     - name: Install ninja-build tool
       uses: seanmiddleditch/gha-setup-ninja@v5
 
+    - name: cache boost build
+      id: cache-boost-build
+      uses: actions/cache@v4.1.0
+      with:
+        path: "${{ steps.workset.outputs.boostdir }}"
+        key: ${{ runner.os }}-boost-build
+
     - name: Install Qt
       # You may pin to the exact commit or the version.
       # uses: jurplel/install-qt-action@f03f05556819ceb3781ee2f455ec44c339d683c0
@@ -75,13 +82,6 @@ jobs:
       if: startsWith(runner.os, 'Linux')
       # 傻逼 ubuntu，好好的 libuv 非要改名 libuv1，脑子得有多秀逗啊
       run: sudo apt-get install -y libuv1-dev libcurl4-openssl-dev libevent-dev
-
-    - name: cache boost build
-      id: cache-boost-build
-      uses: actions/cache@v4.1.0
-      with:
-        path: ${{ steps.workset.outputs.boostdir }}
-        key: ${{ runner.os }}-boost-build
 
     - name: Build Boost
       id: boost
