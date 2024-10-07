@@ -79,6 +79,7 @@ jobs:
 
     - name: cache boost build
       id: cache-boost-build
+      if: startsWith(runner.os, 'Linux')
       uses: actions/cache@v4.1.0
       with:
         lookup-only: false
