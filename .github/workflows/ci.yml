@@ -48,11 +48,15 @@ jobs:
     steps:
     - name: setup variables
       shell: bash
+      id: workset
       run: |
         WORKDIR=$(realpath "${{ github.workspace }}/..")
         pwd
-        realpath "${{ github.workspace }}/.."
+        cd ..
+        pwd
+        WORKDIR=`pwd`
         echo "WORKDIR=${WORKDIR}" >> $GITHUB_ENV
+        echo "workdir=${WORKDIR}" >> $GITHUB_OUTPUT
 
     - uses: actions/checkout@v4
     - name: Install ninja-build tool
@@ -74,7 +78,7 @@ jobs:
       id: cache-boost-build
       uses: actions/cache@v4
       with:
-        path: ${{ env.WORKDIR }}/boost
+        path: ${{ steps.workset.outputs.workdir }}/boost
         key: ${{ runner.os }}-boost-build
 
     - name: Build Boost
@@ -93,8 +97,10 @@ jobs:
       shell: bash
       run: |
         echo "build-output-dir=${{ github.workspace }}/build" >> $GITHUB_OUTPUT
-        echo "BOOST_ROOT=${{ github.workspace }}/../boost" >> $GITHUB_ENV
-        echo "BOOST_LIBRARYDIR=${{ github.workspace }}/../boost/stage/x64/Release/lib" >> $GITHUB_ENV
+        echo "boost_root=${{ steps.workset.outputs.workdir }}/boost" >> $GITHUB_OUTPUT
+        echo "boost_libs=${{ steps.workset.outputs.workdir }}/boost/stage/x64/Release/lib" >> $GITHUB_OUTPUT
+        echo "BOOST_ROOT=${{ steps.workset.outputs.workdir }}/boost" >> $GITHUB_ENV
+        echo "BOOST_LIBRARYDIR=${{ steps.workset.outputs.workdir }}/boost/stage/x64/Release/lib" >> $GITHUB_ENV
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
