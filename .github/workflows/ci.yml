@@ -57,6 +57,7 @@ jobs:
         mkdir boost
         cd boost
         echo "boostdir=$(pwd)" >> $GITHUB_OUTPUT
+        echo "BOOST_ROOT=$(pwd)" >> $GITHUB_ENV
         cd ..
         rm -r boost
 
@@ -68,7 +69,7 @@ jobs:
       id: cache-boost-build
       uses: actions/cache@v4.1.0
       with:
-        path: "${{ steps.workset.outputs.boostdir }}"
+        path: "${{ env.BOOST_ROOT }}"
         key: ${{ runner.os }}-boost-build
 
     - name: Install Qt
