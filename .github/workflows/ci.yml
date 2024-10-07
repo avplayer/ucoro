@@ -66,11 +66,18 @@ jobs:
       id: cache-boost-build
       uses: actions/cache@v4
       with:
-        path: boost
+        path: ${{ github.workspace }}/../boost
         key: ${{ runner.os }}-boost-build
+
+    - name: use Cached boost
+      if: steps.cache-boost-build.outputs.cache-hit == 'true'
+      run: |
+        echo "BOOST_ROOT=${{ github.workspace }}/../boost" >> "$BOOST_ROOT"
+        echo "BOOST_LIBRARYDIR=${{ github.workspace }}/../boost/stage/x64/Release/lib" >> "$BOOST_LIBRARYDIR"
 
     - name: Build Boost
       id: boost
+      if: steps.cache-boost-build.outputs.cache-hit != 'true'
       uses: egor-tensin/build-boost@v1.4
       with:
         version: 1.86.0
@@ -94,8 +101,6 @@ jobs:
         -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
-        -D "BOOST_ROOT=${{ steps.boost.outputs.root }}"
-        -D "BOOST_LIBRARYDIR=${{ steps.boost.outputs.librarydir }}"
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
