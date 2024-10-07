@@ -92,7 +92,7 @@ jobs:
       id: strings
       shell: bash
       run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> $BOOST_LIBRARYDIR
+        echo "build-output-dir=${{ github.workspace }}/build" >> $GITHUB_OUTPUT
         echo "BOOST_ROOT=${{ github.workspace }}/../boost" >> $GITHUB_ENV
         echo "BOOST_LIBRARYDIR=${{ github.workspace }}/../boost/stage/x64/Release/lib" >> $GITHUB_ENV
 
