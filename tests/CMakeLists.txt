@@ -28,7 +28,7 @@ endif(LibUV_FOUND)
 find_package(CURL)
 
 if (CURL_FOUND)
-    add_subdirectory(testcurl)
+    add_subdirectory(test_curl)
 endif(CURL_FOUND)
 
 find_package(Libevent)
