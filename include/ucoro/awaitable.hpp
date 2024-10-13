@@ -174,7 +174,8 @@ namespace ucoro
 			requires(detail::is_awaiter_v<std::decay_t<A>>)
 		auto await_transform(A&& awaiter) const
 		{
-			return std::move(awaiter);
+			static_assert(std::is_rvalue_reference_v<decltype(awaiter)>, "co_await must be used on rvalue");
+			return std::forward<A>(awaiter);
 		}
 
 		template <typename A>
