@@ -412,39 +412,25 @@ namespace ucoro
 
 namespace ucoro
 {
-
-	template <typename T, typename CallbackFunction>
-	struct CallbackAwaiter
+	template <typename T>
+	struct CallbackAwaiterBase
 	{
-	public:
-		explicit CallbackAwaiter(CallbackFunction &&callback_function)
-			: callback_function_(std::move(callback_function))
-		{
-		}
-
-		constexpr bool await_ready() noexcept
-		{
-			return false;
-		}
-
-		auto await_suspend(std::coroutine_handle<> handle)
-		{
-			callback_function_([this](T t) mutable { result_ = std::move(t); });
-			return handle;
-		}
-
 		T await_resume() noexcept
 		{
 			return std::move(result_);
 		}
 
-	private:
-		CallbackFunction callback_function_;
 		T result_;
 	};
 
-	template <typename CallbackFunction>
-	struct CallbackAwaiter<void, CallbackFunction>
+	template <>
+	struct CallbackAwaiterBase<void>
+	{
+		void await_resume() noexcept {}
+	};
+
+	template <typename T, typename CallbackFunction>
+	struct CallbackAwaiter : public CallbackAwaiterBase<T>
 	{
 	public:
 		explicit CallbackAwaiter(CallbackFunction &&callback_function)
@@ -459,12 +445,15 @@ namespace ucoro
 
 		auto await_suspend(std::coroutine_handle<> handle)
 		{
-			callback_function_([]() {});
+			if constexpr ( std::is_void_v<T>)
+			{
+				callback_function_([]() {});
+			}
+			else
+			{
+				callback_function_([this](T t) mutable { this->result_ = std::move(t); });
+			}
 			return handle;
-		}
-
-		void await_resume() noexcept
-		{
 		}
 
 	private:
@@ -474,7 +463,7 @@ namespace ucoro
 	//////////////////////////////////////////////////////////////////////////
 
 	template <typename T, typename CallbackFunction>
-	struct ExecutorAwaiter
+	struct ExecutorAwaiter : public CallbackAwaiterBase<T>
 	{
 	public:
 		explicit ExecutorAwaiter(CallbackFunction &&callback_function)
@@ -489,40 +478,24 @@ namespace ucoro
 
 		void await_suspend(std::coroutine_handle<> handle)
 		{
-			callback_function_([handle = std::move(handle), this](T t) mutable
+			if constexpr ( std::is_void_v<T>)
 			{
-				result_ = std::move(t);
-				handle.resume();
-			});
-		}
-
-		T await_resume() noexcept
-		{
-			return std::move(result_);
-		}
-
-	private:
-		CallbackFunction callback_function_;
-		T result_;
-	};
-
-	template <typename CallbackFunction>
-	struct ExecutorAwaiter<void, CallbackFunction> : std::suspend_always
-	{
-	public:
-		explicit ExecutorAwaiter(CallbackFunction &&callback_function)
-			: callback_function_(std::move(callback_function))
-		{
-		}
-
-		void await_suspend(std::coroutine_handle<> handle)
-		{
-			callback_function_(handle);
+				callback_function_(handle);
+			}
+			else
+			{
+				callback_function_([handle = std::move(handle), this](T t) mutable
+				{
+					this->result_ = std::move(t);
+					handle.resume();
+				});
+			}
 		}
 
 	private:
 		CallbackFunction callback_function_;
 	};
+
 } // namespace ucoro
 
 //////////////////////////////////////////////////////////////////////////
