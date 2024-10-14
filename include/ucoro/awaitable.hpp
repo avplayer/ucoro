@@ -90,7 +90,7 @@ namespace ucoro
 		// 用于判定 T 是否是一个 awaitable<>::promise_type 的类型, 即: 拥有 local_ 成员。
 		template <typename T>
 		concept is_awaitable_promise_type_v = requires (T a){
-			{ a.local_ } -> std::convertible_to<std::any> ;
+			{ a.local_ } -> std::convertible_to<std::shared_ptr<std::any>> ;
 		};
 	} // namespace detail
 
