@@ -43,12 +43,12 @@ namespace ucoro::asio_glue
 
 		auto await_suspend(std::coroutine_handle<typename ucoro::awaitable<T>::promise_type> continue_handle) noexcept
 		{
-			boost::asio::io_context* io;
+			boost::asio::any_io_executor executor;
 			if (continue_handle.promise().local_)
 			{
 				try
 				{
-					io = std::any_cast<boost::asio::io_context*>(*continue_handle.promise().local_);
+					executor = std::any_cast<boost::asio::any_io_executor>(*continue_handle.promise().local_);
 				}
 				catch (const std::bad_any_cast& e)
 				{
@@ -62,7 +62,7 @@ namespace ucoro::asio_glue
 				std::terminate();
 			}
 
-			boost::asio::co_spawn(*io, [this](auto continue_handle) -> boost::asio::awaitable<void>
+			boost::asio::co_spawn(executor, [this](auto continue_handle) -> boost::asio::awaitable<void>
 			{
 				// continue_handle
 				if constexpr (!std::is_void_v<T>)
@@ -88,13 +88,14 @@ namespace ucoro::asio_glue
 		template <typename Handler>
 		void operator()(Handler &&handler, ucoro::awaitable<T> *ucoro_awaitable) const
 		{
+			boost::asio::any_io_executor io_context = boost::asio::get_associated_executor(handler);
 			if constexpr (std::is_void_v<T>)
 			{
 				[handler = std::move(handler), ucoro_awaitable = std::move(*ucoro_awaitable)]() mutable -> ucoro::awaitable<void>
 				{
 					co_await std::move(ucoro_awaitable);
 					handler(boost::system::error_code());
-				}().detach();
+				}().detach(io_context);
 			}
 			else
 			{
@@ -102,7 +103,7 @@ namespace ucoro::asio_glue
 				{
 					auto return_value = co_await std::move(ucoro_awaitable);
 					handler(boost::system::error_code(), return_value);
-				}().detach();
+				}().detach(io_context);
 			}
 
 		}

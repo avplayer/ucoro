@@ -50,7 +50,7 @@ ucoro::awaitable<void> coro_compute()
 
 int main(int argc, char **argv)
 {
-	coro_start(coro_compute(), &main_ioc);
+	coro_start(coro_compute(), boost::asio::any_io_executor(main_ioc.get_executor()));
 
 	main_ioc.run();
 
