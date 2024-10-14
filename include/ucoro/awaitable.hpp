@@ -86,6 +86,12 @@ namespace ucoro
 			{ a.await_suspend(std::coroutine_handle<>{}) } -> is_valid_await_suspend_return_value;
 			{ a.await_resume() };
 		};
+
+		// 用于判定 T 是否是一个 awaitable<>::promise_type 的类型, 即: 拥有 local_ 成员。
+		template <typename T>
+		concept is_awaitable_promise_type_v = requires (T a){
+			{ a.local_ } -> std::convertible_to<std::any> ;
+		};
 	} // namespace detail
 
 	struct debug_coro_promise
@@ -160,98 +166,10 @@ namespace ucoro
 	};
 
 	//////////////////////////////////////////////////////////////////////////
-	//
-
-	struct awaitable_promise_base
-		: public debug_coro_promise
+	// 存储协程 promise 的返回值
+	template<typename T>
+	struct awaitable_promise_value
 	{
-		auto initial_suspend()
-		{
-			return std::suspend_always{};
-		}
-
-		template <typename A>
-			requires(detail::is_awaiter_v<std::decay_t<A>>)
-		auto await_transform(A&& awaiter) const
-		{
-			static_assert(std::is_rvalue_reference_v<decltype(awaiter)>, "co_await must be used on rvalue");
-			return std::forward<A>(awaiter);
-		}
-
-		template <typename A>
-			requires(!detail::is_awaiter_v<std::decay_t<A>>)
-		auto await_transform(A&& awaiter) const
-		{
-			return await_transformer<A>::await_transform(std::move(awaiter));
-		}
-
-		auto await_transform(local_storage_t<void>) noexcept
-		{
-			struct result
-			{
-				awaitable_promise_base *this_;
-
-				constexpr bool await_ready() const noexcept
-				{
-					return true;
-				}
-
-				void await_suspend(std::coroutine_handle<void>) noexcept
-				{
-				}
-
-				auto await_resume() const noexcept
-				{
-					return *this_->local_;
-				}
-			};
-
-			return result{this};
-		}
-
-		template <typename T>
-		auto await_transform(local_storage_t<T>)
-		{
-			struct result
-			{
-				awaitable_promise_base *this_;
-
-				constexpr bool await_ready() const noexcept
-				{
-					return true;
-				}
-
-				void await_suspend(std::coroutine_handle<void>) noexcept
-				{
-				}
-
-				auto await_resume()
-				{
-					return std::any_cast<T>(*this_->local_);
-				}
-			};
-
-			return result{this};
-		}
-
-		std::coroutine_handle<> continuation_;
-		std::shared_ptr<std::any> local_;
-	};
-
-	//////////////////////////////////////////////////////////////////////////
-	// 返回 T 的协程 awaitable_promise 实现.
-
-	// Promise 类型实现...
-	template <typename T>
-	struct awaitable_promise : public awaitable_promise_base
-	{
-		awaitable<T> get_return_object();
-
-		auto final_suspend() noexcept
-		{
-			return final_awaitable<T>{};
-		}
-
 		template <typename V>
 		void return_value(V &&val) noexcept
 		{
@@ -267,28 +185,89 @@ namespace ucoro
 	};
 
 	//////////////////////////////////////////////////////////////////////////
-	// 返回 void 的协程偏特化 awaitable_promise 实现
-
-	template <>
-	struct awaitable_promise<void> : public awaitable_promise_base
+	// 存储协程 promise 的返回值 void 的特化实现
+	template<>
+	struct awaitable_promise_value<void>
 	{
-		awaitable<void> get_return_object();
+		std::exception_ptr exception_{ nullptr };
 
-		auto final_suspend() noexcept
-		{
-			return final_awaitable<void>{};
-		}
-
-		void return_void()
-		{
-		}
+		constexpr void return_void() noexcept { }
 
 		void unhandled_exception() noexcept
 		{
 			exception_ = std::current_exception();
 		}
 
-		std::exception_ptr exception_{ nullptr };
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+	// 返回 T 的协程 awaitable_promise 实现.
+
+	// Promise 类型实现...
+	template <typename T>
+	struct awaitable_promise : public awaitable_promise_value<T>, public debug_coro_promise
+	{
+		awaitable<T> get_return_object();
+
+		auto final_suspend() noexcept
+		{
+			return final_awaitable<T>{};
+		}
+
+		auto initial_suspend()
+		{
+			return std::suspend_always{};
+		}
+
+		template <typename A>
+			requires (detail::is_awaiter_v<std::decay_t<A>>)
+		auto await_transform(A&& awaiter) const
+		{
+			static_assert(std::is_rvalue_reference_v<decltype(awaiter)>, "co_await must be used on rvalue");
+			return std::forward<A>(awaiter);
+		}
+
+		template <typename A>
+			requires (!detail::is_awaiter_v<std::decay_t<A>>)
+		auto await_transform(A&& awaiter) const
+		{
+			return await_transformer<A>::await_transform(std::move(awaiter));
+		}
+
+		void set_local(std::any local)
+		{
+			local_ = std::make_shared<std::any>(local);
+		}
+
+		template <typename localtype>
+		struct local_storage_awaiter
+		{
+			awaitable_promise *this_;
+
+			constexpr bool await_ready() const noexcept { return true; }
+			void await_suspend(std::coroutine_handle<void>) noexcept {}
+
+			auto await_resume() const noexcept
+			{
+				if constexpr (std::is_void_v<localtype>)
+				{
+					return *this_->local_;
+				}
+				else
+				{
+					return std::any_cast<localtype>(*this_->local_);
+				}
+			}
+		};
+
+		template <typename localtype>
+		auto await_transform(local_storage_t<localtype>)
+		{
+			return local_storage_awaiter<localtype>{this};
+		}
+
+		std::coroutine_handle<> continuation_;
+		std::shared_ptr<std::any> local_;
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -384,20 +363,19 @@ namespace ucoro
 		template <typename PromiseType>
 		auto await_suspend(std::coroutine_handle<PromiseType> continuation)
 		{
-			current_coro_handle_.promise().continuation_ = continuation;
-
-			if constexpr (std::is_base_of_v<awaitable_promise_base, PromiseType>)
+			if constexpr (detail::is_awaitable_promise_type_v<PromiseType>)
 			{
 				current_coro_handle_.promise().local_ = continuation.promise().local_;
 			}
 
+			current_coro_handle_.promise().continuation_ = continuation;
 			return current_coro_handle_;
 		}
 
 		void set_local(std::any local)
 		{
 			assert("local has value" && !current_coro_handle_.promise().local_);
-			current_coro_handle_.promise().local_ = std::make_shared<std::any>(local);
+			current_coro_handle_.promise().set_local(local);
 		}
 
 		void detach()
@@ -426,12 +404,6 @@ namespace ucoro
 	awaitable<T> awaitable_promise<T>::get_return_object()
 	{
 		auto result = awaitable<T>{std::coroutine_handle<awaitable_promise<T>>::from_promise(*this)};
-		return result;
-	}
-
-	awaitable<void> awaitable_promise<void>::get_return_object()
-	{
-		auto result = awaitable<void>{std::coroutine_handle<awaitable_promise<void>>::from_promise(*this)};
 		return result;
 	}
 } // namespace ucoro
