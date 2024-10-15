@@ -118,51 +118,6 @@ namespace ucoro
 	};
 
 	//////////////////////////////////////////////////////////////////////////
-	struct awaitable_detached
-	{
-		struct promise_type : public debug_coro_promise
-		{
-			std::suspend_never initial_suspend() noexcept
-			{
-				return {};
-			}
-
-			std::suspend_never final_suspend() noexcept
-			{
-				return {};
-			}
-
-			void return_void() noexcept
-			{
-			}
-
-			void unhandled_exception()
-			{
-			}
-
-			awaitable_detached get_return_object() noexcept
-			{
-				return awaitable_detached();
-			}
-		};
-	};
-
-	//////////////////////////////////////////////////////////////////////////
-
-	template<typename T>
-	struct final_awaitable : std::suspend_always
-	{
-		std::coroutine_handle<> await_suspend(std::coroutine_handle<awaitable_promise<T>> h) noexcept
-		{
-			if (h.promise().continuation_)
-			{
-				return h.promise().continuation_;
-			}
-			return std::noop_coroutine();
-		}
-	};
-
-	//////////////////////////////////////////////////////////////////////////
 	// 存储协程 promise 的返回值
 	template<typename T>
 	struct awaitable_promise_value
@@ -195,6 +150,141 @@ namespace ucoro
 		void unhandled_exception() noexcept
 		{
 			exception_ = std::current_exception();
+		}
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+	// 使用 .detach() 后创建的独立的协程的入口点
+	// 由它开始链式使用 awaitable<>
+	template<typename T = void>
+	struct awaitable_detached
+	{
+		awaitable_detached(const awaitable_detached&) = delete;
+
+		struct promise_type : public awaitable_promise_value<T>, public debug_coro_promise
+		{
+			awaitable_detached get_return_object()
+			{
+				return awaitable_detached{std::coroutine_handle<promise_type>::from_promise(*this)};
+			}
+
+			struct final_awaiter : std::suspend_always
+			{
+				std::coroutine_handle<> await_suspend(std::coroutine_handle<promise_type> final_coro_handle) const noexcept
+				{
+					if (final_coro_handle.promise().continuation_)
+					{
+						// continuation_ 不为空，则 说明 .detach() 被 co_await
+						// 因此，awaitable_detached 析构的时候会顺便撤销自己，所以这里不用 destory
+						// 返回 continuation_，以便让协程框架调用 continuation_.resume()
+						// 这样就把等它的协程唤醒了.
+						return final_coro_handle.promise().continuation_;
+					}
+					// 如果 continuation_ 为空，则说明 .detach() 没有被 co_await
+					// 因此，awaitable_detached 对象其实已经析构
+					// 所以必须主动调用 destroy() 以免内存泄漏.
+					final_coro_handle.destroy();
+					return std::noop_coroutine();
+				}
+			};
+
+			auto initial_suspend() noexcept
+			{
+				return std::suspend_always{};
+			}
+
+			auto final_suspend() noexcept
+			{
+				return final_awaiter{};
+			}
+
+			// 对 detached 的 coro 调用 co_await 相当于 thread.join()
+			// 因此记录这个 continuation 以便在 final awaiter 里唤醒
+			std::coroutine_handle<> continuation_;
+		};
+
+		explicit awaitable_detached(std::coroutine_handle<promise_type> promise_handle)
+			: current_coro_handle_(promise_handle)
+		{
+		}
+
+		awaitable_detached(awaitable_detached&& other)
+			: current_coro_handle_(other.current_coro_handle_)
+		{
+			other.current_coro_handle_ = nullptr;
+		}
+
+		~awaitable_detached()
+		{
+			if (current_coro_handle_)
+			{
+				if (current_coro_handle_.done())
+				{
+					current_coro_handle_.destroy();
+				}
+				else
+				{
+					// 由于 initial_supend 为 suspend_always
+					// 因此 如果不对 .detach() 的返回值调用 co_await
+					// 此协程将不会运行。
+					// 因此，在本对象析构时，协程其实完全没运行过。
+					// 正因为本对象析构的时候，协程都没有运行，就意味着
+					// 其实用户只是调用了 .detach() 并没有对返回值进行
+					// co_await 操作。
+					// 因此为了能把协程运行起来，这里强制调用 resume
+					current_coro_handle_.resume();
+				}
+			}
+		}
+
+		bool await_ready() noexcept
+		{
+			return false;
+		}
+
+		auto await_suspend(std::coroutine_handle<> continuation) noexcept
+		{
+			current_coro_handle_.promise().continuation_ = continuation;
+			return current_coro_handle_;
+		}
+
+		T await_resume()
+		{
+			if constexpr (std::is_void_v<T>)
+			{
+				auto exception = current_coro_handle_.promise().exception_;
+				if (exception)
+				{
+					std::rethrow_exception(exception);
+				}
+			}
+			else
+			{
+				auto ret = std::move(current_coro_handle_.promise().value_);
+				if (std::holds_alternative<std::exception_ptr>(ret))
+				{
+					std::rethrow_exception(std::get<std::exception_ptr>(ret));
+				}
+
+				return std::get<T>(ret);
+			}
+		}
+
+		std::coroutine_handle<promise_type> current_coro_handle_;
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+
+	template<typename T>
+	struct final_awaitable : std::suspend_always
+	{
+		std::coroutine_handle<> await_suspend(std::coroutine_handle<awaitable_promise<T>> h) noexcept
+		{
+			if (h.promise().continuation_)
+			{
+				return h.promise().continuation_;
+			}
+			return std::noop_coroutine();
 		}
 	};
 
@@ -379,21 +469,21 @@ namespace ucoro
 			current_coro_handle_.promise().set_local(local);
 		}
 
-		void detach()
+		auto detach()
 		{
-			auto launch_coro = [](awaitable<T> lazy) -> awaitable_detached { co_await lazy; };
-			[[maybe_unused]] auto detached = launch_coro(std::move(*this));
+			auto launch_coro = [](awaitable<T> lazy) -> awaitable_detached<T> { co_return co_await lazy; };
+			return launch_coro(std::move(*this));
 		}
 
-		void detach(std::any local)
+		auto detach(std::any local)
 		{
 			if (local.has_value())
 			{
 				set_local(local);
 			}
 
-			auto launch_coro = [](awaitable<T> lazy) -> awaitable_detached { co_await lazy; };
-			[[maybe_unused]] auto detached = launch_coro(std::move(*this));
+			auto launch_coro = [](awaitable<T> lazy) -> awaitable_detached<T> { co_return co_await lazy; };
+			return launch_coro(std::move(*this));
 		}
 
 		std::coroutine_handle<promise_type> current_coro_handle_;
@@ -516,13 +606,13 @@ ucoro::ExecutorAwaiter<T, callback> executor_awaitable(callback&& cb)
 }
 
 template<typename Awaitable, typename Local>
-void coro_start(Awaitable&& coro, Local&& local)
+auto coro_start(Awaitable&& coro, Local&& local)
 {
-	coro.detach(local);
+	return coro.detach(local);
 }
 
 template<typename Awaitable>
-void coro_start(Awaitable&& coro)
+auto coro_start(Awaitable&& coro)
 {
-	coro.detach();
+	return coro.detach();
 }
