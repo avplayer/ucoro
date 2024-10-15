@@ -1,0 +1,7 @@
+add_rules("plugin.compile_commands.autoupdate", { outputdir = "build" })
+target("ucoro")
+	set_kind("headeronly")
+	set_languages("c++20")
+	add_includedirs("include", {public = true})
+	add_headerfiles("include/ucoro/*.hpp")
+	includes("tests/xmake.lua")

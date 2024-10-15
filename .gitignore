@@ -4,3 +4,4 @@ build/
 *.kdev4
 CMakeLists.txt.user
 .cache/clangd
+.xmake/
