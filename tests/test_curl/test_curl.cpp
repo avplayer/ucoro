@@ -46,8 +46,8 @@ bool global_exit_loop = false;
 ucoro::awaitable<void> coro_compute()
 {
 	static std::string urls[] = {
-		"https://www.google.com",
-		"https://www.github.com",
+		"https://boost.org",
+		"https://www.boost.io",
 		"https://microcai.org",
 	};
 	for (auto i = 0; i < 3; i++)
