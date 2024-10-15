@@ -207,7 +207,7 @@ awaitable<void> some_work_on_qsocket()
 
 并且使用的时候，要将你用到的 asio 的 io_context 的指针 ( boost::asio::io_context\* )设置为 协程本地存储
 ```c++
- start_coro( your_coroutine(), & io_context );
+ start_coro( your_coroutine(), boost::asio::any_io_executor(io_context.get_executor()) );
 ```
 
 这样启动的协程，里面就可以 co_await 一个 asio::awaitable<> 对象了。比如
@@ -228,7 +228,7 @@ ucoro::awaitable<int> test_coro(int value)
 int main(int argc, char **argv)
 {
     boost::asio::io_context main_ioc;
-	coro_start(test_coro(), &main_ioc);
+    coro_start(coro_compute(), boost::asio::any_io_executor(main_ioc.get_executor()));
 	main_ioc.run();
 	return 0;
 }
@@ -266,7 +266,7 @@ ucoro::awaitable<int> test_coro(int value)
 int main(int argc, char **argv)
 {
     boost::asio::io_context main_ioc;
-    coro_start(test_coro(101), &main_ioc);
+    coro_start(coro_compute(), boost::asio::any_io_executor(main_ioc.get_executor()));
     main_ioc.run();
     return 0;
 }
