@@ -163,7 +163,7 @@ namespace ucoro
 
 		struct promise_type : public awaitable_promise_value<T>, public debug_coro_promise
 		{
-			awaitable_detached get_return_object()
+			awaitable_detached get_return_object() noexcept
 			{
 				return awaitable_detached{std::coroutine_handle<promise_type>::from_promise(*this)};
 			}
@@ -203,18 +203,18 @@ namespace ucoro
 			std::coroutine_handle<> continuation_;
 		};
 
-		explicit awaitable_detached(std::coroutine_handle<promise_type> promise_handle)
+		explicit awaitable_detached(std::coroutine_handle<promise_type> promise_handle) noexcept
 			: current_coro_handle_(promise_handle)
 		{
 		}
 
-		awaitable_detached(awaitable_detached&& other)
+		awaitable_detached(awaitable_detached&& other) noexcept
 			: current_coro_handle_(other.current_coro_handle_)
 		{
 			other.current_coro_handle_ = nullptr;
 		}
 
-		~awaitable_detached()
+		~awaitable_detached() noexcept
 		{
 			if (current_coro_handle_)
 			{
