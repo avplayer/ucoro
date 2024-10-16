@@ -5,7 +5,7 @@
 
 ucoro::awaitable<void> async_sleep_with_uv_timer(int ms)
 {
-	co_await executor_awaitable<void>([ms](auto continuation)
+	co_await callback_awaitable<void>([ms](auto continuation)
 	{
 		struct uv_timer_with_data : uv_timer_s
 		{
@@ -15,16 +15,14 @@ ucoro::awaitable<void> async_sleep_with_uv_timer(int ms)
 				: continuation_(c){}
 		};
 
-		uv_timer_with_data* timer_handle = new uv_timer_with_data { std::move(continuation) };
+		uv_timer_with_data* timer_handle = new uv_timer_with_data { std::forward<decltype(continuation)>(continuation) };
 
 		uv_timer_init(uv_default_loop(), timer_handle);
 		uv_timer_start(timer_handle, [](uv_timer_t* handle)
 		{
 			uv_timer_stop(handle);
-			decltype(continuation) continuation_ = std::move(reinterpret_cast<uv_timer_with_data*>(handle)->continuation_);
+			reinterpret_cast<uv_timer_with_data*>(handle)->continuation_();
 			delete handle;
-
-			continuation_();
 		}, ms, false);
 
 	});
