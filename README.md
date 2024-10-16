@@ -123,12 +123,12 @@ awaitable<void> some_work_with_sleep()
 }
 ```
 
-async_qtimer_shot 只要使用 executor_awaitable 对 QTimer::singleShot 进行一次小小的封装就可以了。
+async_qtimer_shot 只要使用 callback_awaitable 对 QTimer::singleShot 进行一次小小的封装就可以了。
 
 ```cpp
 awaitable<void> async_qtimer_shot(int ms)
 {
-    co_await executor_awaitable<void>([ms](auto continuation) {
+    co_await callback_awaitable<void>([ms](auto continuation) {
         QTimer::singleShot(ms, [continuation = std::move(continuation)]() mutable
         {
 			continuation();
@@ -141,7 +141,7 @@ awaitable<void> async_qtimer_shot(int ms)
 
 可见这种封装是非常容易的。
 
-如果需要 处理有返回值的回调，则只需要把 executor_awaitable<void> 里的 void 替换为相应的类型即可。
+如果需要 处理有返回值的回调，则只需要把 `callback_awaitable<void>` 里的 void 替换为相应的类型即可。
 
 例如为 QTcpSocket 封装为异步读取：
 
@@ -150,7 +150,7 @@ awaitable<int> async_read_qsocket(QTcpSocket* s, void* buffer, int buffer_size)
 {
     QObject* context = new QObject{s};
 
-    auto read_size = co_await executor_awaitable<int>([&context, s, buffer, buffers_size](auto continuation)
+    auto read_size = co_await callback_awaitable<int>([&context, s, buffer, buffers_size](auto continuation)
     {
         QObject::connect(s, &QIODevice::readyRead, context,
             [s, &context, buffer, buffers_size]() mutable

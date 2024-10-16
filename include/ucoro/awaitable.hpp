@@ -602,42 +602,6 @@ namespace ucoro
 		CallbackFunction callback_function_;
 	};
 
-	//////////////////////////////////////////////////////////////////////////
-
-	template<typename T, typename CallbackFunction>
-	struct ExecutorAwaiter : public CallbackAwaiterBase<T>
-	{
-	public:
-		explicit ExecutorAwaiter(CallbackFunction&& callback_function)
-			: callback_function_(std::move(callback_function))
-		{
-		}
-
-		constexpr bool await_ready() noexcept
-		{
-			return false;
-		}
-
-		void await_suspend(std::coroutine_handle<> handle)
-		{
-			if constexpr (std::is_void_v<T>)
-			{
-				callback_function_(handle);
-			}
-			else
-			{
-				callback_function_([handle = std::move(handle), this](T t) mutable
-				{
-					this->result_ = std::move(t);
-					handle.resume();
-				});
-			}
-		}
-
-	private:
-		CallbackFunction callback_function_;
-	};
-
 } // namespace ucoro
 
 //////////////////////////////////////////////////////////////////////////
@@ -646,12 +610,6 @@ template<typename T, typename callback>
 ucoro::CallbackAwaiter<T, callback> callback_awaitable(callback&& cb)
 {
 	return ucoro::CallbackAwaiter<T, callback>{std::forward<callback>(cb)};
-}
-
-template<typename T, typename callback>
-ucoro::ExecutorAwaiter<T, callback> executor_awaitable(callback&& cb)
-{
-	return ucoro::ExecutorAwaiter<T, callback>{std::forward<callback>(cb)};
 }
 
 template<typename Awaitable, typename Local>
