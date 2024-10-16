@@ -36,7 +36,7 @@ namespace std
 #include <functional>
 #include <memory>
 #include <type_traits>
-#include <thread>
+#include <atomic>
 
 #if defined(DEBUG) || defined(_DEBUG)
 #if defined(ENABLE_DEBUG_CORO_LEAK)
