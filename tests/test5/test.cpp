@@ -7,7 +7,7 @@ boost::asio::io_context main_ioc;
 
 ucoro::awaitable<int> coro_compute_int(int value)
 {
-	auto ret = co_await executor_awaitable<int>([value](auto handle) {
+	auto ret = co_await callback_awaitable<int>([value](auto handle) {
 		main_ioc.post([value, handle = std::move(handle)]() mutable {
 			std::this_thread::sleep_for(std::chrono::seconds(0));
 			std::cout << value << " value\n";

@@ -90,7 +90,7 @@ ucoro::awaitable<int> coro_compute_int(int value)
 {
     executor_service* executor = co_await ucoro::local_storage_t<executor_service*>();
 
-    auto ret = co_await executor_awaitable<int>([executor, value](auto handle)
+    auto ret = co_await callback_awaitable<int>([executor, value](auto handle)
         {
             executor->enqueue([value, handle = std::move(handle)]() mutable
                 {
