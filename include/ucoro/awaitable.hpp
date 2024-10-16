@@ -542,11 +542,11 @@ namespace ucoro
 		}
 
 		// 用户调用 handle( ret_value ) 就是在这里执行的.
-		void resume_coro(std::coroutine_handle<> handle, std::shared_ptr<std::atomic_flag> executor_detect_flag)
+		void resume_coro(std::coroutine_handle<> handle)
 		{
-			if (executor_detect_flag->test_and_set())
+			if (executor_detect_flag_->test_and_set())
 			{
-				// 如果执行到这里，说明 executor_detect_flag 运行在 callback_function_ 返回之后，所以也就
+				// 如果执行到这里，说明 executor_detect_flag_ 运行在 callback_function_ 返回之后，所以也就
 				// 是说运行在 executor 中。
 				handle.resume();
 			}
@@ -554,52 +554,55 @@ namespace ucoro
 
 		std::coroutine_handle<> await_suspend(std::coroutine_handle<> handle)
 		{
-			auto executor_detect_flag = std::make_shared<std::atomic_flag>();
+			executor_detect_flag_ = std::make_unique<std::atomic_flag>();
 
 			if constexpr (std::is_void_v<T>)
 			{
-				callback_function_([this, handle, executor_detect_flag]() mutable
+				callback_function_([this, handle]() mutable
 				{
-					return resume_coro(handle, executor_detect_flag);
+					return resume_coro(handle);
 				});
 			}
 			else
 			{
-				callback_function_([this, executor_detect_flag, handle](T t) mutable
+				callback_function_([this, handle](T t) mutable
 				{
 					this->result_ = std::move(t);
-					return resume_coro(handle, executor_detect_flag);
+					return resume_coro(handle);
 				});
 			}
 
-			if (executor_detect_flag->test_and_set())
+			if (executor_detect_flag_->test_and_set())
 			{
-				// 如果执行到这里，说明 executor_detect_flag 已经被执行，这里分 2 种情况:
+				// 如果执行到这里，说明 resume_coro 已经被执行，这里分 2 种情况:
 				//
-				// 第一种情况就是
-				// 在 executor 线程中执行了 executor_detect_flag executor 线程快于当前线程。
+				// 第一种情况就是在 executor 线程中执行了 resume_coro，executor 线程快于当前线程。
 				//
-				// executor 线程快于当前线程的情况下，executor_detect_flag 什么都不会做，仅仅只设置 flag。
-				// 如果 executor 线程慢于当前线程，则上面的 flag.test_and_set() 会返回 false 并
-				// 设置 flag，然后执行 return std::noop_coroutine(); 在此后的 executor_detect_flag 中
-				// 因为 flag.test_and_set() 为 true 将会 resume 协程。
+				// executor 线程快于当前线程的情况下，resume_coro 什么都不会做，仅仅只设置 executor_detect_flag_
 				//
-				// 第二种情况就是 executor_detect_flag 直接被 callback_function_ executor_detect_flag
-				// 也仅仅只设置 flag。
+				// 如果 executor 线程慢于当前线程，则上面的 executor_detect_flag_.test_and_set() 会
+				// 返回 false 并设置为 true，然后便会执行 else 部分的 return std::noop_coroutine();
+				// 在此后的 executor_detect_flag_ 中，因为 executor_detect_flag_.test_and_set() 为
+				// true 将会 resume 协程。
 				//
-				// 无论哪一种情况，我们都可以在这里直接返回 handle 让协程框架维护协程 resume。
+				// 第二种情况就是 resume_coro 直接被 callback_function_ 调用，resume_coro 函数也仅仅
+				// 只设置 executor_detect_flag_ 为 true 不作任何事情，在 callback_function_ 返回后
+				// 上面的 if (executor_detect_flag_->test_and_set()) 语句将为 true 而执行下面的
+				// return handler; 语句。
+				//
 				return handle;
 			}
 			else
 			{
-				// 如果执行到这里，说明 executor_detect_flag 肯定没被执行，说明是由 executor 驱动.
-				// executor 驱动即返回 noop_coroutine 即可.
+				// 如果执行到这里，说明 resume_coro 肯定没被执行，说明协程唤醒是由 executor 驱动，此时
+				// 即返回 noop_coroutine 即可.
 				return std::noop_coroutine();
 			}
 		}
 
 	private:
 		CallbackFunction callback_function_;
+		std::unique_ptr<std::atomic_flag> executor_detect_flag_;
 	};
 
 	//////////////////////////////////////////////////////////////////////////
