@@ -33,9 +33,11 @@ namespace std
 #include <any>
 #include <cassert>
 #include <cstdlib>
-#include <functional>
+#include <atomic>
 #include <memory>
 #include <type_traits>
+#include <chrono>
+#include <thread>
 
 #if defined(DEBUG) || defined(_DEBUG)
 #if defined(ENABLE_DEBUG_CORO_LEAK)
@@ -116,6 +118,25 @@ namespace ucoro
 
 #endif // DEBUG_CORO_PROMISE_LEAK
 	};
+
+	struct generic_continuation_no_arg
+	{
+		void operator()(){}
+	};
+
+	struct generic_continuation_one_arg
+	{
+		template<typename T>
+		void operator()(T&&){}
+	};
+
+	struct generic_continuation : public generic_continuation_no_arg, public generic_continuation_one_arg
+	{
+		using generic_continuation_no_arg::operator();
+		using generic_continuation_one_arg::operator();
+
+	};
+
 
 	//////////////////////////////////////////////////////////////////////////
 	// 存储协程 promise 的返回值
@@ -314,7 +335,88 @@ namespace ucoro
 			return std::forward<A>(awaiter);
 		}
 
-		template<typename A> requires (!detail::is_awaiter_v<std::decay_t<A>>)
+		template<typename CallbackFunc> requires ( std::is_invocable<CallbackFunc, generic_continuation>::value )
+		auto await_transform(CallbackFunc&& awaiter) const
+		{
+			using ValueType = std::invoke_result_t<CallbackFunc, generic_continuation>;
+
+			if constexpr (std::is_void_v<ValueType>)
+			{
+				struct awaiter_t
+				{
+					CallbackFunc awaitee_;
+
+					constexpr bool await_ready() noexcept { return false; }
+					constexpr void await_resume() noexcept {}
+					void await_suspend(std::coroutine_handle<> handle) noexcept
+					{
+						awaitee_( handle );
+					}
+				};
+
+				return awaiter_t{awaiter};
+			}
+			else
+			{
+				struct awaiter_t
+				{
+					CallbackFunc callbackfunction;
+
+					ValueType result_;
+					std::atomic_flag resume_flag;
+
+					constexpr bool await_ready() noexcept { return false; }
+					std::coroutine_handle<> await_suspend(std::coroutine_handle<> handle) noexcept
+					{
+						auto thread_id = std::this_thread::get_id();
+
+						callbackfunction( [this, thread_id, handle = handle](auto Result) mutable
+						{
+							result_ = Result;
+
+							// 换线程了，一定是被 post 到别处执行了。
+							if (thread_id != std::this_thread::get_id())
+							{
+								return handle.resume();
+							}
+							// 未换线程，那么此处代码和 callbackfunction 返回后的代码是同步执行的.
+							// 因此可以用 flag 进行判断是否是被 post 执行的
+							// 如果是被 post 但是线程是同一个，那么 resume_flag 此时一定已经被 set
+							// 既然如此，就调用 resume
+							if (resume_flag.test_and_set())
+							{
+								return handle.resume();
+							}
+						});
+
+						// 如果 callbackfunction 里 handle 被 post 到别的线程执行，那么 resume_flag 一定是 false
+						// 因此返回 noop_corotine
+						// 如果 callbackfunction 里 handle 被 post 到还是本线程执行，那么 resume_flag 一定是 false
+						// 因为 post 到本线程执行，则代码一定还没执行
+						// 如果 resume_flag 已经 true，则 awaitee_ 里面的 handle 一定是同步执行的
+						// 此时 callbackfunction 里面的 handle 一定不会调用 .resume()
+						// 因此，这里只要 return handle 就可以让协程被不爆栈的方式 resume
+
+						if (resume_flag.test_and_set())
+						{
+							return handle;
+						}
+						else
+						{
+							return std::noop_coroutine();
+						}
+					}
+
+					ValueType await_resume() noexcept { return result_; }
+				};
+
+				return awaiter_t{awaiter};
+			}
+
+
+		}
+
+		template<typename A>
 		auto await_transform(A&& awaiter) const
 		{
 			return await_transformer<A>::await_transform(std::move(awaiter));

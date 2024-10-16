@@ -4,10 +4,11 @@
 
 ucoro::awaitable<int> coro_compute_int(int value)
 {
-	auto ret = co_await callback_awaitable<int>([value](auto handle) {
+	auto ret = co_await [value](auto handle) -> int {
 		std::cout << value << " value\n";
 		handle(value * 100);
-	});
+		return 0;
+	};
 
 	co_return (value + ret);
 }
