@@ -104,7 +104,7 @@ ucoro::awaitable<int> coro_compute_int(int value)
 
 ucoro::awaitable<void> coro_compute()
 {
-    for (auto i = 0; i < 100; i++)
+    for (auto i = 0; i < 200000 ; i++)
     {
         co_await coro_compute_int(i);
     }
@@ -116,7 +116,7 @@ ucoro::awaitable<void> coro_compute()
 int main(int argc, char** argv)
 {
     executor_service srv;
-    srv.start_workers(4);
+    srv.start_workers(42);
 
     coro_start(coro_compute(), &srv);
 

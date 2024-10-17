@@ -6,6 +6,7 @@
 #pragma once
 
 #include <concepts>
+#include <thread>
 #include <variant>
 
 #if defined(__has_include)
@@ -31,12 +32,12 @@ namespace std
 #endif
 
 #include <any>
+#include <atomic>
 #include <cassert>
 #include <cstdlib>
 #include <functional>
 #include <memory>
 #include <type_traits>
-#include <atomic>
 
 #if defined(DEBUG) || defined(_DEBUG)
 #if defined(ENABLE_DEBUG_CORO_LEAK)
@@ -60,12 +61,6 @@ namespace ucoro
 	template<typename T>
 	struct awaitable_promise;
 
-	template<typename T, typename CallbackFunction>
-	struct ExecutorAwaiter;
-
-	template<typename T, typename CallbackFunction>
-	struct CallbackAwaiter;
-
 	template<typename T>
 	struct local_storage_t
 	{
@@ -81,7 +76,7 @@ namespace ucoro
 
 		// 用于判定 T 是否是一个 awaiter 的类型, 即: 拥有 await_ready，await_suspend，await_resume 成员函数的结构或类.
 		template<typename T>
-		concept is_awaiter_v = requires (T a) {
+		concept is_awaiter_v = requires(T a) {
 			{ a.await_ready() } -> std::convertible_to<bool>;
 			{ a.await_suspend(std::coroutine_handle<>{}) } -> is_valid_await_suspend_return_value;
 			{ a.await_resume() };
@@ -89,7 +84,7 @@ namespace ucoro
 
 		// 用于判定 T 是否是一个 awaitable<>::promise_type 的类型, 即: 拥有 local_ 成员。
 		template<typename T>
-		concept is_awaitable_promise_type_v = requires (T a) {
+		concept is_awaitable_promise_type_v = requires(T a) {
 			{ a.local_ } -> std::convertible_to<std::shared_ptr<std::any>>;
 		};
 	} // namespace detail
@@ -171,7 +166,8 @@ namespace ucoro
 
 			struct final_awaiter : std::suspend_always
 			{
-				std::coroutine_handle<> await_suspend(std::coroutine_handle<promise_type> final_coro_handle) const noexcept
+				std::coroutine_handle<> await_suspend(
+					std::coroutine_handle<promise_type> final_coro_handle) const noexcept
 				{
 					if (final_coro_handle.promise().continuation_)
 					{
@@ -209,8 +205,7 @@ namespace ucoro
 		{
 		}
 
-		awaitable_detached(awaitable_detached&& other) noexcept
-			: current_coro_handle_(other.current_coro_handle_)
+		awaitable_detached(awaitable_detached&& other) noexcept : current_coro_handle_(other.current_coro_handle_)
 		{
 			other.current_coro_handle_ = nullptr;
 		}
@@ -223,7 +218,7 @@ namespace ucoro
 				{
 					current_coro_handle_.destroy();
 				}
-				else
+				else if (current_coro_handle_.promise().continuation_ == nullptr)
 				{
 					// 由于 initial_supend 为 suspend_always
 					// 因此 如果不对 .detach() 的返回值调用 co_await
@@ -303,19 +298,19 @@ namespace ucoro
 			return final_awaitable<T>{};
 		}
 
-		auto initial_suspend()
+		auto initial_suspend() noexcept
 		{
 			return std::suspend_always{};
 		}
 
-		template<typename A> requires (detail::is_awaiter_v<std::decay_t<A>>)
+		template<typename A> requires(detail::is_awaiter_v<std::decay_t<A>>)
 		auto await_transform(A&& awaiter) const
 		{
 			static_assert(std::is_rvalue_reference_v<decltype(awaiter)>, "co_await must be used on rvalue");
 			return std::forward<A>(awaiter);
 		}
 
-		template<typename A> requires (!detail::is_awaiter_v<std::decay_t<A>>)
+		template<typename A> requires(!detail::is_awaiter_v<std::decay_t<A>>)
 		auto await_transform(A&& awaiter) const
 		{
 			return await_transformer<A>::await_transform(std::move(awaiter));
@@ -507,44 +502,103 @@ namespace ucoro
 	template<typename T>
 	struct CallbackAwaiterBase
 	{
-		T await_resume() noexcept
-		{
-			return std::move(result_);
-		}
-
 		T result_;
 	};
 
 	template<>
 	struct CallbackAwaiterBase<void>
 	{
-		void await_resume() noexcept
-		{
-		}
 	};
 
 	template<typename T, typename CallbackFunction>
 	struct CallbackAwaiter : public CallbackAwaiterBase<T>
 	{
 		CallbackAwaiter(const CallbackAwaiter&) = delete;
-		CallbackAwaiter& operator = (const CallbackAwaiter&) = delete;
+		CallbackAwaiter& operator=(const CallbackAwaiter&) = delete;
+
 	public:
-		explicit CallbackAwaiter(CallbackFunction&& callback_function)
-			: callback_function_(std::forward<CallbackFunction>(callback_function))
+		struct promise_type : public awaitable_promise_value<T>, public debug_coro_promise
+		{
+			std::coroutine_handle<> continuation_;
+			std::unique_ptr<CallbackFunction> callback_function_;
+			std::unique_ptr<std::atomic_flag> executor_detect_flag_;
+
+			CallbackAwaiter get_return_object()
+			{
+				return CallbackAwaiter(std::coroutine_handle<promise_type>::from_promise(*this));
+			}
+
+			auto initial_suspend() noexcept
+			{
+				return std::suspend_always{};
+			}
+
+			auto final_suspend() noexcept
+			{
+				struct final_awaitable : std::suspend_always
+				{
+					std::coroutine_handle<> await_suspend(std::coroutine_handle<promise_type> h) noexcept
+					{
+						if (h.promise().continuation_)
+						{
+							return h.promise().continuation_;
+						}
+						return std::noop_coroutine();
+					}
+				};
+				return final_awaitable{};
+			}
+
+			auto await_transform(CallbackFunction&& cb)
+			{
+				return CallbackAwaiter(std::coroutine_handle<promise_type>::from_promise(*this),
+									   std::forward<CallbackFunction>(cb));
+			}
+		};
+
+		std::coroutine_handle<promise_type> current_coro_;
+
+		explicit CallbackAwaiter(std::coroutine_handle<promise_type> current_coro) : current_coro_(current_coro)
 		{
 		}
 
-		CallbackAwaiter(CallbackAwaiter&&) = default;
+		explicit CallbackAwaiter(std::coroutine_handle<promise_type> current_coro, CallbackFunction&& callback_function)
+			: current_coro_(current_coro)
+		{
+			current_coro_.promise().callback_function_ =
+				std::make_unique<CallbackFunction>(std::forward<CallbackFunction>(callback_function));
+			current_coro_.promise().executor_detect_flag_ = std::make_unique<std::atomic_flag>();
+		}
+
+		CallbackAwaiter(CallbackAwaiter&& o)
+		{
+			current_coro_ = o.current_coro_;
+			o.current_coro_ = nullptr;
+		}
 
 		constexpr bool await_ready() noexcept
 		{
 			return false;
 		}
 
+		auto await_resume() noexcept
+		{
+			if constexpr (!std::is_void_v<T>)
+			{
+				return std::move(this->result_);
+			}
+		}
+
+		std::coroutine_handle<> await_suspend(std::coroutine_handle<> continuation) noexcept
+		{
+			current_coro_.promise().continuation_ = continuation;
+			return current_coro_;
+		}
+
 		// 用户调用 handle( ret_value ) 就是在这里执行的.
 		void resume_coro(std::coroutine_handle<> handle)
 		{
-			if (executor_detect_flag_->test_and_set())
+			if (current_coro_.promise().executor_detect_flag_->test_and_set())
 			{
 				// 如果执行到这里，说明 executor_detect_flag_ 运行在 callback_function_ 返回之后，所以也就
 				// 是说运行在 executor 中。
@@ -552,27 +606,25 @@ namespace ucoro
 			}
 		}
 
-		std::coroutine_handle<> await_suspend(std::coroutine_handle<> handle)
+		std::coroutine_handle<> await_suspend(std::coroutine_handle<promise_type> handle)
 		{
-			executor_detect_flag_ = std::make_unique<std::atomic_flag>();
 
 			if constexpr (std::is_void_v<T>)
 			{
-				callback_function_([this, handle]() mutable
-				{
-					return resume_coro(handle);
-				});
+				(*current_coro_.promise().callback_function_)([this, handle]() mutable { return resume_coro(handle); });
 			}
 			else
 			{
-				callback_function_([this, handle](T t) mutable
+				(*current_coro_.promise().callback_function_)([this, handle](T t) mutable
 				{
 					this->result_ = std::move(t);
 					return resume_coro(handle);
 				});
 			}
 
-			if (executor_detect_flag_->test_and_set())
+			std::this_thread::sleep_for(std::chrono::microseconds(1));
+
+			if (current_coro_.promise().executor_detect_flag_->test_and_set())
 			{
 				// 如果执行到这里，说明 resume_coro 已经被执行，这里分 2 种情况:
 				//
@@ -596,13 +648,12 @@ namespace ucoro
 			{
 				// 如果执行到这里，说明 resume_coro 肯定没被执行，说明协程唤醒是由 executor 驱动，此时
 				// 即返回 noop_coroutine 即可.
+				// std::this_thread::sleep_for(std::chrono::microseconds(1));
 				return std::noop_coroutine();
 			}
 		}
 
 	private:
-		CallbackFunction callback_function_;
-		std::unique_ptr<std::atomic_flag> executor_detect_flag_;
 	};
 
 } // namespace ucoro
@@ -612,7 +663,7 @@ namespace ucoro
 template<typename T, typename callback>
 ucoro::CallbackAwaiter<T, callback> callback_awaitable(callback&& cb)
 {
-	return ucoro::CallbackAwaiter<T, callback>{std::forward<callback>(cb)};
+	co_return co_await std::forward<callback>(cb); // ucoro::CallbackAwaiter<T, callback>{std::forward<callback>(cb)};
 }
 
 template<typename Awaitable, typename Local>
