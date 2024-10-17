@@ -559,20 +559,41 @@ namespace ucoro
 		{
 			executor_detect_flag_ = std::make_unique<std::atomic_flag>();
 
-			if constexpr (std::is_void_v<T>)
+			auto exception_detect_flag = std::make_shared<std::atomic_flag>();
+
+			try
 			{
-				callback_function_([this, handle]() mutable
+				if constexpr (std::is_void_v<T>)
 				{
-					return resume_coro(handle);
-				});
+					callback_function_([this, handle, exception_detect_flag]() mutable
+					{
+						if (exception_detect_flag->test_and_set())
+							return;
+						return resume_coro(handle);
+					});
+				}
+				else
+				{
+					callback_function_([this, handle, exception_detect_flag](T t) mutable
+					{
+						if (exception_detect_flag->test_and_set())
+							return;
+						this->result_ = std::move(t);
+						return resume_coro(handle);
+					});
+				}
 			}
-			else
+			catch (...)
 			{
-				callback_function_([this, handle](T t) mutable
-				{
-					this->result_ = std::move(t);
-					return resume_coro(handle);
-				});
+				exception_detect_flag->test_and_set();
+
+				auto e = std::current_exception();
+
+				// 这里的 rethrow_exception 将导致当前协程直接被 resume 并将异常传递给调用者协程的 promise
+				std::rethrow_exception(e);
+
+				// 不可到达.
+				for (;;);
 			}
 
 			if (executor_detect_flag_->test_and_set())
@@ -592,13 +613,13 @@ namespace ucoro
 				// 只设置 executor_detect_flag_ 为 true 不作任何事情，在 callback_function_ 返回后
 				// 上面的 if (executor_detect_flag_->test_and_set()) 语句将为 true 而执行下面的
 				// return false; 语句。
-				// 返回 false 等同于 handle.resume() 但是不会爆栈. 
+				// 返回 false 等同于 handle.resume() 但是不会爆栈.
 				return false;
 			}
 			else
 			{
 				// 如果执行到这里，说明 resume_coro 肯定没被执行，说明协程唤醒是由 executor 驱动，此时
-				// 即返回 true 即可. 
+				// 即返回 true 即可.
 				// 返回 true 等同于不调用 handle.resume(), 于是执行流程会最终返回 executor 的循环事件
 				// 里。至于协程何时恢复，就要等 resume_coro 被调用啦.
 				return true;
