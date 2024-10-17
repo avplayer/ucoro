@@ -24,7 +24,7 @@ jobs:
       # To add more build types (Release, Debug, RelWithDebInfo, etc.) customize the build_type list.
       matrix:
         os: [ubuntu-24.04, windows-latest]
-        build_type: [Release]
+        build_type: [Release, Debug]
         c_compiler: [gcc, clang, cl]
         include:
           - os: windows-latest
@@ -48,6 +48,13 @@ jobs:
     - uses: actions/checkout@v4
     - name: Install ninja-build tool
       uses: seanmiddleditch/gha-setup-ninja@v5
+    
+    - name: compiler setup
+      if: startsWith(runner.os, 'Linux')
+      shell: bash
+      run: |
+        echo "CC=${{ matrix.c_compiler }}" >> $GITHUB_ENV
+        echo "CXX=${{ matrix.cpp_compiler }}" >> $GITHUB_ENV
 
     - name: Install Qt
       # You may pin to the exact commit or the version.
@@ -97,8 +104,6 @@ jobs:
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: >
         cmake -B ${{ steps.strings.outputs.build-output-dir }}
-        -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
-        -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
         -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
         -S ${{ github.workspace }}
         -D "BOOST_ROOT=${{ env.BOOST_ROOT }}"
