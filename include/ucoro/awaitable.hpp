@@ -546,6 +546,7 @@ namespace ucoro
 		};
 
 		std::coroutine_handle<promise_type> current_coro_;
+		bool hold_callback {false};
 
 		explicit CallbackAwaiter(std::coroutine_handle<promise_type> current_coro) : current_coro_(current_coro)
 		{
@@ -554,6 +555,7 @@ namespace ucoro
 		explicit CallbackAwaiter(std::coroutine_handle<promise_type> current_coro, CallbackFunction&& callback_function)
 			: current_coro_(current_coro)
 		{
+			hold_callback = true;
 			current_coro_.promise().callback_function_ =
 				std::make_unique<CallbackFunction>(std::forward<CallbackFunction>(callback_function));
 			current_coro_.promise().executor_detect_flag_ = std::make_unique<std::atomic_flag>();
@@ -563,6 +565,14 @@ namespace ucoro
 		{
 			current_coro_ = o.current_coro_;
 			o.current_coro_ = nullptr;
+		}
+
+		~CallbackAwaiter()
+		{
+			if (hold_callback)
+				return;
+			if (current_coro_ && current_coro_.done())
+				current_coro_.destroy();
 		}
 
 		constexpr bool await_ready() noexcept
