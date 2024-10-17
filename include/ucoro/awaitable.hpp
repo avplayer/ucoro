@@ -499,19 +499,8 @@ namespace ucoro
 
 namespace ucoro
 {
-	template<typename T>
-	struct CallbackAwaiterBase
-	{
-		T result_;
-	};
-
-	template<>
-	struct CallbackAwaiterBase<void>
-	{
-	};
-
 	template<typename T, typename CallbackFunction>
-	struct CallbackAwaiter : public CallbackAwaiterBase<T>
+	struct CallbackAwaiter
 	{
 		CallbackAwaiter(const CallbackAwaiter&) = delete;
 		CallbackAwaiter& operator=(const CallbackAwaiter&) = delete;
@@ -581,11 +570,25 @@ namespace ucoro
 			return false;
 		}
 
-		auto await_resume() noexcept
+		T await_resume()
 		{
-			if constexpr (!std::is_void_v<T>)
+			if constexpr (std::is_void_v<T>)
 			{
-				return std::move(this->result_);
+				auto exception = current_coro_.promise().exception_;
+				if (exception)
+				{
+					std::rethrow_exception(exception);
+				}
+			}
+			else
+			{
+				auto ret = std::move(current_coro_.promise().value_);
+				if (std::holds_alternative<std::exception_ptr>(ret))
+				{
+					std::rethrow_exception(std::get<std::exception_ptr>(ret));
+				}
+
+				return std::get<T>(ret);
 			}
 		}
 
@@ -617,12 +620,10 @@ namespace ucoro
 			{
 				(*current_coro_.promise().callback_function_)([this, handle](T t) mutable
 				{
-					this->result_ = std::move(t);
+					current_coro_.promise().return_value(t);
 					return resume_coro(handle);
 				});
 			}
-
-			std::this_thread::sleep_for(std::chrono::microseconds(1));
 
 			if (current_coro_.promise().executor_detect_flag_->test_and_set())
 			{

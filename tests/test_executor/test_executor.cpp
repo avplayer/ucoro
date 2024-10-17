@@ -94,7 +94,6 @@ ucoro::awaitable<int> coro_compute_int(int value)
         {
             executor->enqueue([value, handle = std::move(handle)]() mutable
                 {
-                    std::cout << value << " value\n";
                     handle(value * 100);
                 });
         });
@@ -104,7 +103,7 @@ ucoro::awaitable<int> coro_compute_int(int value)
 
 ucoro::awaitable<void> coro_compute()
 {
-    for (auto i = 0; i < 200000 ; i++)
+    for (auto i = 0; ; i++)
     {
         co_await coro_compute_int(i);
     }
