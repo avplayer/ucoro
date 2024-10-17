@@ -37,6 +37,7 @@ namespace std
 #include <memory>
 #include <type_traits>
 #include <atomic>
+#include <cassert>
 
 #if defined(DEBUG) || defined(_DEBUG)
 #if defined(ENABLE_DEBUG_CORO_LEAK)
@@ -442,7 +443,9 @@ namespace ucoro
 				auto ret = std::move(current_coro_handle_.promise().value_);
 				if (std::holds_alternative<std::exception_ptr>(ret))
 				{
-					std::rethrow_exception(std::get<std::exception_ptr>(ret));
+					auto exception = std::get<std::exception_ptr>(ret);
+					assert(exception && "The exception must not be nullptr!");
+					std::rethrow_exception(exception);
 				}
 
 				current_coro_handle_.destroy();
