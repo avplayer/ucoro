@@ -552,7 +552,7 @@ namespace ucoro
 			}
 		}
 
-		std::coroutine_handle<> await_suspend(std::coroutine_handle<> handle)
+		bool await_suspend(std::coroutine_handle<> handle)
 		{
 			executor_detect_flag_ = std::make_unique<std::atomic_flag>();
 
@@ -588,15 +588,17 @@ namespace ucoro
 				// 第二种情况就是 resume_coro 直接被 callback_function_ 调用，resume_coro 函数也仅仅
 				// 只设置 executor_detect_flag_ 为 true 不作任何事情，在 callback_function_ 返回后
 				// 上面的 if (executor_detect_flag_->test_and_set()) 语句将为 true 而执行下面的
-				// return handler; 语句。
-				//
-				return handle;
+				// return false; 语句。
+				// 返回 false 等同于 handle.resume() 但是不会爆栈. 
+				return false;
 			}
 			else
 			{
 				// 如果执行到这里，说明 resume_coro 肯定没被执行，说明协程唤醒是由 executor 驱动，此时
-				// 即返回 noop_coroutine 即可.
-				return std::noop_coroutine();
+				// 即返回 true 即可. 
+				// 返回 true 等同于不调用 handle.resume(), 于是执行流程会最终返回 executor 的循环事件
+				// 里。至于协程何时恢复，就要等 resume_coro 被调用啦.
+				return true;
 			}
 		}
 
