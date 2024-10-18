@@ -7,6 +7,8 @@ int main(int argc, char **argv)
 	using CallbackAwaiterType0 = ucoro::CallbackAwaiter<void, decltype([](auto h) {}) >;
 	using CallbackAwaiterType1 = ucoro::CallbackAwaiter<int, decltype([](auto h) {}) > ;
 
+	static_assert(ucoro::detail::is_instance_of_v<ucoro::local_storage_t<void>, ucoro::local_storage_t>, "not a local_storage_t");
+
 	static_assert(ucoro::detail::is_awaiter_v < CallbackAwaiterType0 >, "not a coroutine");
 	static_assert(ucoro::detail::is_awaiter_v < CallbackAwaiterType1 >, "not a coroutine");
 
