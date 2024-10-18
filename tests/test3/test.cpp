@@ -12,8 +12,8 @@ int main(int argc, char **argv)
 	static_assert(ucoro::detail::is_awaiter_v < CallbackAwaiterType0 >, "not a coroutine");
 	static_assert(ucoro::detail::is_awaiter_v < CallbackAwaiterType1 >, "not a coroutine");
 
-	static_assert(ucoro::detail::is_awaiter_v < ucoro::awaitable<void> >, "not a coroutine");
-	static_assert(ucoro::detail::is_awaiter_v < ucoro::awaitable<int> >, "not a coroutine");
+	static_assert(ucoro::detail::is_awaiter_v < ucoro::awaitable_awaiter<void> >, "not a coroutine");
+	static_assert(ucoro::detail::is_awaiter_v < ucoro::awaitable_awaiter<int> >, "not a coroutine");
 
 	static_assert(!ucoro::detail::is_awaiter_v < int >, "not a coroutine");
 

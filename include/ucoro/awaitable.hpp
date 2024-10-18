@@ -59,6 +59,9 @@ namespace ucoro
 	struct awaitable;
 
 	template<typename T>
+	struct awaitable_awaiter;
+
+	template<typename T>
 	struct awaitable_promise;
 
 	template<typename T, typename CallbackFunction>
@@ -107,6 +110,14 @@ namespace ucoro
 			{ a.await_resume() };
 		};
 
+		template<typename T>
+		concept has_operator_co_await = requires (T a)
+		{
+			{ a.operator co_await() } -> is_awaiter_v;
+		};
+				// 用于判定 T 是否是一个 awaitable<>::promise_type 的类型, 即: 拥有 local_ 成员。
+		template<typename T>
+		concept is_awaitable_v = is_awaiter_v<T> || has_operator_co_await<T>;
 	} // namespace detail
 
 	struct debug_coro_promise
@@ -266,14 +277,18 @@ namespace ucoro
 			{
 				return local_storage_awaiter<typename detail::local_storage_value_type<std::decay_t<A>>::value_type>{this};
 			}
-			else if constexpr ( detail::is_awaiter_v<std::decay_t<A>> )
+			else if constexpr ( detail::is_awaitable_v<std::decay_t<A>> )
 			{
 				static_assert(std::is_rvalue_reference_v<decltype(awaiter)>, "co_await must be used on rvalue");
 				return std::forward<A>(awaiter);
 			}
-			else
+			else if constexpr ( requires (A ) { await_transformer<A>::await_transform; })
 			{
 				return await_transformer<A>::await_transform(std::move(awaiter));
+			}
+			else
+			{
+				static_assert(0, "co_await must be called on an awaitable type");
 			}
 		}
 
@@ -334,28 +349,6 @@ namespace ucoro
 		awaitable& operator=(const awaitable&) = delete;
 		awaitable& operator=(awaitable&) = delete;
 
-		constexpr bool await_ready() const noexcept
-		{
-			return false;
-		}
-
-		T await_resume()
-		{
-			return current_coro_handle_.promise().get_value();
-		}
-
-		template<typename PromiseType>
-		auto await_suspend(std::coroutine_handle<PromiseType> continuation)
-		{
-			if constexpr (detail::is_instance_of_v<PromiseType, awaitable_promise>)
-			{
-				current_coro_handle_.promise().local_ = continuation.promise().local_;
-			}
-
-			current_coro_handle_.promise().continuation_ = continuation;
-			return current_coro_handle_;
-		}
-
 		void set_local(std::any local)
 		{
 			assert("local has value" && !current_coro_handle_.promise().local_);
@@ -383,7 +376,45 @@ namespace ucoro
 			return launched_coro;
 		}
 
+		awaitable_awaiter<T> operator co_await ()
+		{
+			return  awaitable_awaiter<T>{this};
+		}
+
 		std::coroutine_handle<promise_type> current_coro_handle_;
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+	// awaitable 的等待器
+	template<typename T>
+	struct awaitable_awaiter
+	{
+		awaitable<T>* this_;
+
+		constexpr bool await_ready() const noexcept
+		{
+			return false;
+		}
+
+		T await_resume()
+		{
+			return this_->current_coro_handle_.promise().get_value();
+		}
+
+		template<typename PromiseType>
+		auto await_suspend(std::coroutine_handle<PromiseType> continuation)
+		{
+			if constexpr (detail::is_instance_of_v<PromiseType, awaitable_promise>)
+			{
+				auto& calee_promise = this_->current_coro_handle_.promise();
+				auto& caller_promise = continuation.promise();
+				calee_promise.local_ = caller_promise.local_;
+			}
+
+			this_->current_coro_handle_.promise().continuation_ = continuation;
+			return this_->current_coro_handle_;
+		}
+
 	};
 
 	//////////////////////////////////////////////////////////////////////////
