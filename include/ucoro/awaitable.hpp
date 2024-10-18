@@ -135,6 +135,16 @@ namespace ucoro
 			value_.template emplace<std::exception_ptr>(std::current_exception());
 		}
 
+		T get_value() const
+		{
+			if (std::holds_alternative<std::exception_ptr>(value_))
+			{
+				std::rethrow_exception(std::get<std::exception_ptr>(value_));
+			}
+
+			return std::get<T>(value_);
+		}
+
 		std::variant<std::exception_ptr, T> value_{nullptr};
 	};
 
@@ -153,6 +163,15 @@ namespace ucoro
 		{
 			exception_ = std::current_exception();
 		}
+
+		void get_value()
+		{
+			if (exception_)
+			{
+				std::rethrow_exception(exception_);
+			}
+		}
+
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -182,6 +201,10 @@ namespace ucoro
 						// 这样就把等它的协程唤醒了.
 						return final_coro_handle.promise().continuation_;
 					}
+					// 并且，如果协程处于 .detach() 而没有被 co_await
+					// 则异常一直存储在 promise 里，并没有代码会去调用他的 await_resume() 重抛异常
+					// 所以这里重新抛出来，避免有被静默吞并的异常
+					final_coro_handle.promise().get_value();
 					// 如果 continuation_ 为空，则说明 .detach() 没有被 co_await
 					// 因此，awaitable_detached 对象其实已经析构
 					// 所以必须主动调用 destroy() 以免内存泄漏.
@@ -252,24 +275,7 @@ namespace ucoro
 
 		T await_resume()
 		{
-			if constexpr (std::is_void_v<T>)
-			{
-				auto exception = current_coro_handle_.promise().exception_;
-				if (exception)
-				{
-					std::rethrow_exception(exception);
-				}
-			}
-			else
-			{
-				auto ret = std::move(current_coro_handle_.promise().value_);
-				if (std::holds_alternative<std::exception_ptr>(ret))
-				{
-					std::rethrow_exception(std::get<std::exception_ptr>(ret));
-				}
-
-				return std::get<T>(ret);
-			}
+			return current_coro_handle_.promise().get_value();
 		}
 
 		std::coroutine_handle<promise_type> current_coro_handle_;
