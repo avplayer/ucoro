@@ -168,6 +168,22 @@ namespace ucoro
 		template<concepts::awaitable_type AwaitableType>
 		using awaitable_return_type = template_parameter_of<AwaitableType, awaitable>;
 
+		template<typename T>
+		struct exception_with_result
+		{
+			using type = std::variant<std::exception_ptr, T>;
+		};
+
+		template<>
+		struct exception_with_result<void>
+		{
+			using type = std::exception_ptr;
+		};
+
+		template<typename T>
+		using exception_with_result_t = typename exception_with_result<T>::type;
+
+
 	} // namespace traits
 
 	struct debug_coro_promise
@@ -239,7 +255,7 @@ namespace ucoro
 			exception_ = std::current_exception();
 		}
 
-		void get_value()
+		void get_value() const
 		{
 			if (exception_)
 			{
@@ -431,18 +447,50 @@ namespace ucoro
 			current_coro_handle_.promise().set_local(std::move(local));
 		}
 
-		auto detach()
-		{
-			auto launch_coro = [](awaitable<T> lazy) -> awaitable<T> { co_return co_await std::move(lazy); };
-			return launch_coro(std::move(*this));
-		}
-
-		auto detach(std::any local)
+		auto detach(std::any local = {})
 		{
 			auto launched_coro = [](awaitable<T> lazy) mutable -> awaitable<T>
 			{
 				co_return co_await std::move(lazy);
 			}(std::move(*this));
+
+			if (local.has_value())
+			{
+				launched_coro.set_local(local);
+			}
+
+			return launched_coro;
+		}
+
+		template<typename Function> requires std::is_invocable_v<Function, ucoro::traits::exception_with_result_t<T>>
+		auto detach_with_callback(Function completion_handler)
+		{
+			return detach_with_callback<Function>(std::any{}, completion_handler);
+		}
+
+		template<typename Function> requires std::is_invocable_v<Function, ucoro::traits::exception_with_result_t<T>>
+		auto detach_with_callback(std::any local, Function completion_handler)
+		{
+			auto launched_coro = [](awaitable<T> lazy, auto completion_handler) mutable -> awaitable<void>
+			{
+				using result_wrapper = ucoro::traits::exception_with_result_t<T>;
+				try
+				{
+					if constexpr (std::is_void_v<T>)
+					{
+						co_await std::move(lazy);
+						completion_handler(result_wrapper{nullptr});
+					}
+					else
+					{
+						completion_handler(result_wrapper{co_await std::move(lazy)});
+					}
+				}
+				catch(...)
+				{
+					completion_handler(result_wrapper{std::current_exception()});
+				}
+			}(std::move(*this), std::move(completion_handler));
 
 			if (local.has_value())
 			{
@@ -463,6 +511,7 @@ namespace ucoro
 		auto result = awaitable<T>{std::coroutine_handle<awaitable_promise<T>>::from_promise(*this)};
 		return result;
 	}
+
 } // namespace ucoro
 
 //////////////////////////////////////////////////////////////////////////
@@ -598,9 +647,15 @@ namespace ucoro
 //////////////////////////////////////////////////////////////////////////
 
 template<typename T, typename callback>
-ucoro::CallbackAwaiter<T, callback> callback_awaitable(callback&& cb)
+auto callback_awaitable(callback&& cb) -> ucoro::awaitable<T>
 {
-	return ucoro::CallbackAwaiter<T, callback>{std::forward<callback>(cb)};
+	co_return co_await ucoro::CallbackAwaiter<T, callback>{std::forward<callback>(cb)};
+}
+
+template<typename Awaitable, typename Local, typename CompleteFunction>
+auto coro_start(Awaitable&& coro, Local&& local, CompleteFunction completer)
+{
+	return coro.detach_with_callback(local, completer);
 }
 
 template<typename Awaitable, typename Local>
@@ -613,4 +668,31 @@ template<typename Awaitable>
 auto coro_start(Awaitable&& coro)
 {
 	return coro.detach();
+}
+
+template<typename T>
+auto sync_await(ucoro::awaitable<T> lazy, std::any local_ = {}) -> T
+{
+	ucoro::traits::exception_with_result_t<T> result;
+
+	lazy.detach_with_callback(local_, [&](ucoro::traits::exception_with_result_t<T> result_)
+	{
+		result = result_;
+	});
+
+	if constexpr (std::is_void_v<T>)
+	{
+		if (result)
+		{
+			std::rethrow_exception(result);
+		}
+	}
+	else
+	{
+		if (std::holds_alternative<std::exception_ptr>(result))
+		{
+			std::rethrow_exception(std::get<std::exception_ptr>(result));
+		}
+		return std::get<T>(result);
+	}
 }
