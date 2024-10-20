@@ -62,9 +62,6 @@ namespace ucoro
 	struct awaitable_promise;
 
 	template<typename T, typename CallbackFunction>
-	struct ExecutorAwaiter;
-
-	template<typename T, typename CallbackFunction>
 	struct CallbackAwaiter;
 
 	template<typename T>
