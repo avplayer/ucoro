@@ -72,39 +72,103 @@ namespace ucoro
 	inline constexpr local_storage_t<void> local_storage;
 
 	//////////////////////////////////////////////////////////////////////////
-	namespace detail
+	namespace concepts
 	{
-		// 用于判定 T 是否是一个 U<anytype> 的类型
-		// 比如
-		// is_instance_of_v<std::vector<int>,std::vector>;  // true
-		// is_instance_of_v<std::vector<int>,std::list>;  // false
-		template<class T, template<class...> class U>
-		inline constexpr bool is_instance_of_v = std::false_type{};
-		template<template<class...> class U, class... Vs>
-		inline constexpr bool is_instance_of_v<U<Vs...>,U> = std::true_type{};
-
-		template<class LocalStorage>
-		struct local_storage_value_type;
-
-		template<class ValueType>
-		struct local_storage_value_type<local_storage_t<ValueType>>
+		// 类型是否是 local_storage_t<> 的一种
+		template<typename T>
+		concept local_storage_type = requires(T x)
 		{
-			typedef ValueType value_type;
+			{ local_storage_t{x} } -> std::same_as<T>;
 		};
 
+		// 类型是否是 awaitable<> 的一种
 		template<typename T>
-		concept is_valid_await_suspend_return_value =
-			std::convertible_to<T, std::coroutine_handle<>> || std::is_void_v<T> || std::is_same_v<T, bool>;
+		concept awaitable_type = requires(T x)
+		{
+			{ awaitable{x} } -> std::same_as<T>;
+		};
+
+		// 类型是否是 awaitable_promise<> 的一种
+		template<typename T>
+		concept awaitable_promise_type = requires(T x)
+		{
+			{ awaitable_promise{x} } -> std::same_as<T>;
+		};
+
+		// await_suspend 有三种返回值
+		template<typename T>
+		concept is_valid_await_suspend_return_value = std::convertible_to<T, std::coroutine_handle<>> ||
+													std::is_void_v<T> ||
+													std::is_same_v<T, bool>;
 
 		// 用于判定 T 是否是一个 awaiter 的类型, 即: 拥有 await_ready，await_suspend，await_resume 成员函数的结构或类.
 		template<typename T>
-		concept is_awaiter_v = requires (T a) {
-			{ a.await_ready() } -> std::convertible_to<bool>;
+		concept is_awaiter_v = requires (T a)
+		{
+			{ a.await_ready() } -> std::same_as<bool>;
 			{ a.await_suspend(std::coroutine_handle<>{}) } -> is_valid_await_suspend_return_value;
 			{ a.await_resume() };
 		};
 
-	} // namespace detail
+		template<typename T>
+		concept has_operator_co_await = requires (T a)
+		{
+			{ a.operator co_await() } -> is_awaiter_v;
+ 		};
+
+		// 用于判定 T 是可以用在 co_await 后面
+		template<typename T>
+		concept is_awaitable_v = is_awaiter_v<typename std::decay_t<T>> ||
+									awaitable_type<T> ||
+		 							has_operator_co_await<typename std::decay_t<T>>;
+
+
+		template<typename T>
+		concept has_user_defined_await_transformer = requires (T&& a)
+		{
+			await_transformer<T>::await_transform(std::move(a));
+		};
+
+
+	} // namespace concepts
+
+	namespace traits
+	{
+		//////////////////////////////////////////////////////////////////////////
+		// 用于从 A = U<T> 类型里提取 T 参数
+		// 比如
+		// template_parameter_of<local_storage_t<int>, local_storage_t>;  // int
+		// template_parameter_of<decltype(local_storage), local_storage_t>;  // void
+		//
+		// 首先定义一个接受 template_parameter_of<Testee, FromTemplate> 这样的一个默认模板萃取
+		template<typename Testee, template<typename> typename FromTemplate>
+		struct template_parameter_traits;
+
+		// 接着定义一个偏特化，匹配 template_parameter_traits<模板名<参数>, 模板名>
+		// 这样，这个偏特化的 template_parameter_traits 就有了一个
+		// 名为 template_parameter 的成员类型，其定义的类型就是 _template_parameter
+		// 于是就把 TemplateParameter 这个类型给萃取出来了
+		template<template<typename> typename ClassTemplate, typename TemplateParameter>
+		struct template_parameter_traits<ClassTemplate<TemplateParameter>, ClassTemplate>
+		{
+			using template_parameter = TemplateParameter ;
+		};
+
+		// 最后，定义一个简化用法的 using 让用户的地方代码变短点
+		template<typename TesteeType, template<typename> typename FromTemplate>
+		using template_parameter_of = typename template_parameter_traits<
+									std::decay_t<TesteeType>, FromTemplate>::template_parameter;
+
+		// 利用 通用工具 template_parameter_of 萃取 local_storage_t<T> 里的 T
+		template<concepts::local_storage_type LocalStorage>
+		using local_storage_value_type = template_parameter_of<LocalStorage, local_storage_t>;
+
+
+		// 利用 通用工具 template_parameter_of 萃取 awaitable<T> 里的 T
+		template<concepts::awaitable_type AwaitableType>
+		using awaitable_return_type = template_parameter_of<AwaitableType, awaitable>;
+
+	} // namespace traits
 
 	struct debug_coro_promise
 	{
@@ -259,18 +323,26 @@ namespace ucoro
 		template<typename A>
 		auto await_transform(A&& awaiter) const
 		{
-			if constexpr ( detail::is_instance_of_v<std::decay_t<A>, local_storage_t> )
+			if constexpr (concepts::local_storage_type<std::decay_t<A>>)
 			{
-				return local_storage_awaiter<typename detail::local_storage_value_type<std::decay_t<A>>::value_type>{this};
+				// 调用 co_await local_storage_t<T>
+				return local_storage_awaiter<traits::local_storage_value_type<std::decay_t<A>>>{this};
 			}
-			else if constexpr ( detail::is_awaiter_v<std::decay_t<A>> )
+			else if constexpr (concepts::is_awaitable_v<A>)
 			{
-				static_assert(std::is_rvalue_reference_v<decltype(awaiter)>, "co_await must be used on rvalue");
+				// 调用 co_await awaitable<T>; 或者其他有三件套的类型
+				static_assert(std::is_rvalue_reference_v<A&&>, "co_await must be used on rvalue");
 				return std::forward<A>(awaiter);
+			}
+			else if constexpr (concepts::has_user_defined_await_transformer<A>)
+			{
+				// 调用 co_await 其他写了 await_transformer 的自定义类型.
+				// 例如包含了 asio_glue.hpp 后，就可以 co_await asio::awaitable<T>;
+				return await_transformer<A>::await_transform(std::move(awaiter));
 			}
 			else
 			{
-				return await_transformer<A>::await_transform(std::move(awaiter));
+				static_assert(0, "co_await must been used on an awaitable");
 			}
 		}
 
@@ -344,7 +416,7 @@ namespace ucoro
 		template<typename PromiseType>
 		auto await_suspend(std::coroutine_handle<PromiseType> continuation)
 		{
-			if constexpr (detail::is_instance_of_v<PromiseType, awaitable_promise>)
+			if constexpr (concepts::awaitable_promise_type<PromiseType>)
 			{
 				current_coro_handle_.promise().local_ = continuation.promise().local_;
 			}
