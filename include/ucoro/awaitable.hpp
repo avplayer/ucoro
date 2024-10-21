@@ -59,6 +59,9 @@ namespace ucoro
 	struct awaitable;
 
 	template<typename T>
+	struct awaitable_awaiter;
+
+	template<typename T>
 	struct awaitable_promise;
 
 	template<typename T, typename CallbackFunction>
@@ -346,7 +349,7 @@ namespace ucoro
 				// 调用 co_await local_storage_t<T>
 				return local_storage_awaiter<traits::local_storage_value_type<std::decay_t<A>>>{this};
 			}
-			else if constexpr (concepts::is_awaitable_v<A>)
+			else if constexpr (concepts::is_awaitable_v<std::decay_t<A>>)
 			{
 				// 调用 co_await awaitable<T>; 或者其他有三件套的类型
 				static_assert(std::is_rvalue_reference_v<A&&>, "co_await must be used on rvalue");
@@ -421,28 +424,6 @@ namespace ucoro
 		awaitable& operator=(const awaitable&) = delete;
 		awaitable& operator=(awaitable&) = delete;
 
-		constexpr bool await_ready() const noexcept
-		{
-			return false;
-		}
-
-		T await_resume()
-		{
-			return current_coro_handle_.promise().get_value();
-		}
-
-		template<typename PromiseType>
-		auto await_suspend(std::coroutine_handle<PromiseType> continuation)
-		{
-			if constexpr (concepts::awaitable_promise_type<PromiseType>)
-			{
-				current_coro_handle_.promise().local_ = continuation.promise().local_;
-			}
-
-			current_coro_handle_.promise().continuation_ = continuation;
-			return current_coro_handle_;
-		}
-
 		void set_local(std::any local)
 		{
 			assert("local has value" && !current_coro_handle_.promise().local_);
@@ -502,7 +483,45 @@ namespace ucoro
 			return launched_coro;
 		}
 
+		awaitable_awaiter<T> operator co_await ()
+		{
+			return  awaitable_awaiter<T>{this};
+		}
+
 		std::coroutine_handle<promise_type> current_coro_handle_;
+	};
+
+	//////////////////////////////////////////////////////////////////////////
+	// awaitable 的等待器
+	template<typename T>
+	struct awaitable_awaiter
+	{
+		awaitable<T>* this_;
+
+		constexpr bool await_ready() const noexcept
+		{
+			return false;
+		}
+
+		T await_resume()
+		{
+			return this_->current_coro_handle_.promise().get_value();
+		}
+
+		template<typename PromiseType>
+		auto await_suspend(std::coroutine_handle<PromiseType> continuation)
+		{
+			if constexpr (concepts::awaitable_promise_type<PromiseType>)
+			{
+				auto& calee_promise = this_->current_coro_handle_.promise();
+				auto& caller_promise = continuation.promise();
+				calee_promise.local_ = caller_promise.local_;
+			}
+
+			this_->current_coro_handle_.promise().continuation_ = continuation;
+			return this_->current_coro_handle_;
+		}
+
 	};
 
 	//////////////////////////////////////////////////////////////////////////
