@@ -129,6 +129,8 @@ namespace ucoro
 			await_transformer<T>::await_transform(std::move(a));
 		};
 
+		template<typename T>
+		struct is_not_awaitable : std::false_type{};
 
 	} // namespace concepts
 
@@ -358,7 +360,7 @@ namespace ucoro
 			}
 			else
 			{
-				static_assert(0, "co_await must been used on an awaitable");
+				static_assert(concepts::is_not_awaitable<A>::value, "co_await must be called on an awaitable type");
 			}
 		}
 
