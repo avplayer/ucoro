@@ -23,7 +23,7 @@ jobs:
       #
       # To add more build types (Release, Debug, RelWithDebInfo, etc.) customize the build_type list.
       matrix:
-        os: [ubuntu-24.04, windows-latest]
+        os: [ubuntu-24.04, windows-latest, macos-latest]
         build_type: [Release, Debug]
         c_compiler: [gcc, clang, cl]
         include:
@@ -36,6 +36,9 @@ jobs:
           - os: ubuntu-24.04
             c_compiler: clang
             cpp_compiler: clang++
+          - os: macos-latest
+            c_compiler: clang
+            cpp_compiler: clang++
         exclude:
           - os: windows-latest
             c_compiler: gcc
@@ -43,18 +46,29 @@ jobs:
             c_compiler: clang
           - os: ubuntu-24.04
             c_compiler: cl
+          - os: macos-latest
+            c_compiler: cl
+          - os: macos-latest
+            c_compiler: gcc
 
     steps:
     - uses: actions/checkout@v4
     - name: Install ninja-build tool
       uses: seanmiddleditch/gha-setup-ninja@v5
-    
-    - name: compiler setup
+
+    - name: compiler setup on Linux
       if: startsWith(runner.os, 'Linux')
       shell: bash
       run: |
         echo "CC=${{ matrix.c_compiler }}" >> $GITHUB_ENV
         echo "CXX=${{ matrix.cpp_compiler }}" >> $GITHUB_ENV
+
+    - name: compiler setup on Mac OS
+      if: startsWith(runner.os, 'macOS') && startsWith(matrix.c_compiler, 'clang')
+      shell: bash
+      run: |
+        echo "CC=$(brew --prefix llvm@15)/bin/clang" >> $GITHUB_ENV
+        echo "CXX=$(brew --prefix llvm@15)/bin/clang++" >> $GITHUB_ENV
 
     - name: Install Qt
       # You may pin to the exact commit or the version.
@@ -111,7 +125,7 @@ jobs:
 
     - name: Build
       # Build your program with the given configuration. Note that --config is needed because the default Windows generator is a multi-config generator (Visual Studio generator).
-      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+      run: cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }} -v
 
     - name: Test
       working-directory: ${{ steps.strings.outputs.build-output-dir }}
