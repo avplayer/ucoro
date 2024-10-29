@@ -40,3 +40,9 @@ if (LIBEVENT_FOUND)
 endif(LIBEVENT_FOUND)
 
 add_subdirectory(test_executor)
+
+find_package(c-ares)
+
+if(c-ares_FOUND)
+    add_subdirectory(test_cares)
+endif()
