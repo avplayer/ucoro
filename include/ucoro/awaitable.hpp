@@ -55,11 +55,11 @@ namespace ucoro
 	template<typename T>
 	struct await_transformer;
 
-	template<typename T>
-	struct awaitable;
-
-	template<typename T>
+	template<typename T, typename Allocator>
 	struct awaitable_promise;
+
+	template<typename T, typename Allocator = std::allocator<char>>
+	struct awaitable;
 
 	template<typename T, typename CallbackFunction>
 	struct CallbackAwaiter;
@@ -143,27 +143,29 @@ namespace ucoro
 		// template_parameter_of<decltype(local_storage), local_storage_t>;  // void
 		//
 		// 首先定义一个接受 template_parameter_of<Testee, FromTemplate> 这样的一个默认模板萃取
-		template<typename Testee, template<typename> typename FromTemplate>
+		template<typename Testee, template<typename...> typename FromTemplate>
 		struct template_parameter_traits;
 
 		// 接着定义一个偏特化，匹配 template_parameter_traits<模板名<参数>, 模板名>
 		// 这样，这个偏特化的 template_parameter_traits 就有了一个
 		// 名为 template_parameter 的成员类型，其定义的类型就是 _template_parameter
 		// 于是就把 TemplateParameter 这个类型给萃取出来了
-		template<template<typename> typename ClassTemplate, typename TemplateParameter>
-		struct template_parameter_traits<ClassTemplate<TemplateParameter>, ClassTemplate>
+		template<template<typename...> typename ClassTemplate, typename... TemplateParameter>
+		struct template_parameter_traits<ClassTemplate<TemplateParameter...>, ClassTemplate>
 		{
-			using template_parameter = TemplateParameter ;
+			using template_parameter_tuple = std::tuple<TemplateParameter...>;
+			using template_parameter = typename std::tuple_element<0, template_parameter_tuple>::type;
 		};
 
 		// 最后，定义一个简化用法的 using 让用户的地方代码变短点
-		template<typename TesteeType, template<typename> typename FromTemplate>
+		template<typename TesteeType, template<typename...> typename FromTemplate>
 		using template_parameter_of = typename template_parameter_traits<
 									std::decay_t<TesteeType>, FromTemplate>::template_parameter;
 
 		// 利用 通用工具 template_parameter_of 萃取 local_storage_t<T> 里的 T
 		template<concepts::local_storage_type LocalStorage>
 		using local_storage_value_type = template_parameter_of<LocalStorage, local_storage_t>;
+		
 
 
 		// 利用 通用工具 template_parameter_of 萃取 awaitable<T> 里的 T
@@ -188,28 +190,30 @@ namespace ucoro
 
 	} // namespace traits
 
-	struct debug_coro_promise
+	template<typename Allocator>
+	struct coro_promise_allocation
 	{
-#if defined(DEBUG_CORO_PROMISE_LEAK)
-
 		void* operator new(std::size_t size)
 		{
-			void* ptr = std::malloc(size);
+			void* ptr = Allocator{}.allocate(size);// std::malloc(size);
 			if (!ptr)
 			{
 				throw std::bad_alloc{};
 			}
+#if defined(DEBUG_CORO_PROMISE_LEAK)
 			debug_coro_leak.insert(ptr);
+#endif // DEBUG_CORO_PROMISE_LEAK
 			return ptr;
 		}
 
 		void operator delete(void* ptr, [[maybe_unused]] std::size_t size)
 		{
+#if defined(DEBUG_CORO_PROMISE_LEAK)
 			debug_coro_leak.erase(ptr);
-			std::free(ptr);
+#endif // DEBUG_CORO_PROMISE_LEAK
+			Allocator{}.deallocate((typename Allocator::value_type*)(ptr), size);
 		}
 
-#endif // DEBUG_CORO_PROMISE_LEAK
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -267,44 +271,41 @@ namespace ucoro
 	};
 
 	//////////////////////////////////////////////////////////////////////////
-
-	template<typename T>
-	struct final_awaitable : std::suspend_always
-	{
-		std::coroutine_handle<> await_suspend(std::coroutine_handle<awaitable_promise<T>> h) noexcept
-		{
-			if (h.promise().continuation_)
-			{
-				// continuation_ 不为空，则 说明 .detach() 被 co_await
-				// 因此，awaitable_detached 析构的时候会顺便撤销自己，所以这里不用 destory
-				// 返回 continuation_，以便让协程框架调用 continuation_.resume()
-				// 这样就把等它的协程唤醒了.
-				return h.promise().continuation_;
-			}
-			// 并且，如果协程处于 .detach() 而没有被 co_await
-			// 则异常一直存储在 promise 里，并没有代码会去调用他的 await_resume() 重抛异常
-			// 所以这里重新抛出来，避免有被静默吞并的异常
-			h.promise().get_value();
-			// 如果 continuation_ 为空，则说明 .detach() 没有被 co_await
-			// 因此，awaitable_detached 对象其实已经析构
-			// 所以必须主动调用 destroy() 以免内存泄漏.
-			h.destroy();
-			return std::noop_coroutine();
-		}
-	};
-
-	//////////////////////////////////////////////////////////////////////////
 	// 返回 T 的协程 awaitable_promise 实现.
 
 	// Promise 类型实现...
-	template<typename T>
-	struct awaitable_promise : public awaitable_promise_value<T>, public debug_coro_promise
+	template<typename T, typename Allocator>
+	struct awaitable_promise : public awaitable_promise_value<T>, public coro_promise_allocation<Allocator>
 	{
-		awaitable<T> get_return_object();
+		awaitable<T, Allocator> get_return_object();
 
 		auto final_suspend() noexcept
 		{
-			return final_awaitable<T>{};
+			struct final_awaitable : std::suspend_always
+			{
+				std::coroutine_handle<> await_suspend(std::coroutine_handle<awaitable_promise> h) noexcept
+				{
+					if (h.promise().continuation_)
+					{
+						// continuation_ 不为空，则 说明 .detach() 被 co_await
+						// 因此，awaitable_detached 析构的时候会顺便撤销自己，所以这里不用 destory
+						// 返回 continuation_，以便让协程框架调用 continuation_.resume()
+						// 这样就把等它的协程唤醒了.
+						return h.promise().continuation_;
+					}
+					// 并且，如果协程处于 .detach() 而没有被 co_await
+					// 则异常一直存储在 promise 里，并没有代码会去调用他的 await_resume() 重抛异常
+					// 所以这里重新抛出来，避免有被静默吞并的异常
+					h.promise().get_value();
+					// 如果 continuation_ 为空，则说明 .detach() 没有被 co_await
+					// 因此，awaitable_detached 对象其实已经析构
+					// 所以必须主动调用 destroy() 以免内存泄漏.
+					h.destroy();
+					return std::noop_coroutine();
+				}
+			};
+
+			return final_awaitable{};
 		}
 
 		auto initial_suspend()
@@ -371,10 +372,10 @@ namespace ucoro
 	//////////////////////////////////////////////////////////////////////////
 
 	// awaitable 协程包装...
-	template<typename T>
+	template<typename T, typename Allocator>
 	struct awaitable
 	{
-		using promise_type = awaitable_promise<T>;
+		using promise_type = awaitable_promise<T, Allocator>;
 
 		explicit awaitable(std::coroutine_handle<promise_type> h)
 			: current_coro_handle_(h)
@@ -507,10 +508,10 @@ namespace ucoro
 
 	//////////////////////////////////////////////////////////////////////////
 
-	template<typename T>
-	awaitable<T> awaitable_promise<T>::get_return_object()
+	template<typename T, typename Allocator>
+	awaitable<T, Allocator> awaitable_promise<T, Allocator>::get_return_object()
 	{
-		auto result = awaitable<T>{std::coroutine_handle<awaitable_promise<T>>::from_promise(*this)};
+		auto result = awaitable<T, Allocator>{std::coroutine_handle<awaitable_promise<T, Allocator>>::from_promise(*this)};
 		return result;
 	}
 

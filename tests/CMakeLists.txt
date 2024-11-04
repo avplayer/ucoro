@@ -40,3 +40,5 @@ if (LIBEVENT_FOUND)
 endif(LIBEVENT_FOUND)
 
 add_subdirectory(test_executor)
+
+add_subdirectory(test_custom_allocator)
