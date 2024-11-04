@@ -1,0 +1,6 @@
+
+add_executable(test_custom_allocator test.cpp)
+target_link_libraries(test_custom_allocator ucoro)
+
+add_test(NAME test_custom_allocator COMMAND test_custom_allocator)
+set_target_properties(test_custom_allocator PROPERTIES FOLDER "ucoro_tests")
