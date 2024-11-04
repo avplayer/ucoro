@@ -1,7 +1,7 @@
 #include <iostream>
-#include "ucoro/awaitable.hpp"
-
 #include "uv.h"
+#include <coroutine>
+import ucoro;
 
 ucoro::awaitable<void> async_sleep_with_uv_timer(int ms)
 {

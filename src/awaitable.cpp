@@ -1,9 +1,9 @@
-﻿//
+﻿module;
+
+//
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
-
-#pragma once
 
 #include <concepts>
 #include <variant>
@@ -50,7 +50,9 @@ inline std::unordered_set<void*> debug_coro_leak;
 #endif
 #endif
 
-namespace ucoro
+export module ucoro;
+
+export namespace ucoro
 {
 	template<typename T>
 	struct await_transformer;
@@ -545,7 +547,7 @@ namespace ucoro
 		CallbackAwaiter(const CallbackAwaiter&) = delete;
 		CallbackAwaiter& operator = (const CallbackAwaiter&) = delete;
 	public:
-		explicit CallbackAwaiter(CallbackFunction&& callback_function)
+		explicit CallbackAwaiter(CallbackFunction&& callback_function) noexcept
 			: callback_function_(std::forward<CallbackFunction>(callback_function))
 		{
 		}
@@ -647,31 +649,35 @@ namespace ucoro
 } // namespace ucoro
 
 //////////////////////////////////////////////////////////////////////////
-
+export
 template<typename T, typename callback>
 auto callback_awaitable(callback&& cb) -> ucoro::awaitable<T>
 {
 	co_return co_await ucoro::CallbackAwaiter<T, callback>{std::forward<callback>(cb)};
 }
 
+export
 template<typename Awaitable, typename Local, typename CompleteFunction>
 auto coro_start(Awaitable&& coro, Local&& local, CompleteFunction completer)
 {
 	return coro.detach_with_callback(local, completer);
 }
 
+export
 template<typename Awaitable, typename Local>
 auto coro_start(Awaitable&& coro, Local&& local)
 {
 	return coro.detach(local);
 }
 
+export
 template<typename Awaitable>
 auto coro_start(Awaitable&& coro)
 {
 	return coro.detach();
 }
 
+export
 template<typename T>
 auto sync_await(ucoro::awaitable<T> lazy, std::any local_ = {}) -> T
 {

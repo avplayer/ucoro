@@ -2,8 +2,9 @@
 #include <boost/asio.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <iostream>
-#include "ucoro/awaitable.hpp"
 #include "ucoro/asio_glue.hpp"
+#include <coroutine>
+import ucoro;
 
 boost::asio::io_context main_ioc;
 

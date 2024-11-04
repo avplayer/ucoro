@@ -1,6 +1,8 @@
 #include <iostream>
-#include "ucoro/awaitable.hpp"
+#include <coroutine>
 
+#include <coroutine>
+import ucoro;
 
 ucoro::awaitable<void> coro_compute_exec(int value)
 {

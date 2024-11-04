@@ -1,5 +1,7 @@
 #include <iostream>
-#include "ucoro/awaitable.hpp"
+#include <any>
+#include <coroutine>
+import ucoro;
 
 
 ucoro::awaitable<int> coro_compute_int(int value)

@@ -1,5 +1,7 @@
 #include <iostream>
-#include "ucoro/awaitable.hpp"
+
+#include <coroutine>
+import ucoro;
 
 #include "event2/event.h"
 

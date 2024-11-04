@@ -1,9 +1,10 @@
 #include <future>
 #include <iostream>
 #include <thread>
-#include "ucoro/awaitable.hpp"
-
 #include "curl/curl.h"
+#include <coroutine>
+import ucoro;
+
 
 struct completion_job_data
 {

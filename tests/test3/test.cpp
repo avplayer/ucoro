@@ -1,6 +1,6 @@
 #include <iostream>
-#include "ucoro/awaitable.hpp"
-
+#include <coroutine>
+import ucoro;
 
 int main(int argc, char **argv)
 {

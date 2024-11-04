@@ -1,10 +1,13 @@
 
 
 #include <iostream>
-#include "ucoro/awaitable.hpp"
 #include <QtCore>
 #include <QTimer>
 #include <QCoreApplication>
+#include <coroutine>
+#include <any>
+
+import ucoro;
 
 ucoro::awaitable<int> coro_compute_int(int value)
 {

@@ -1,7 +1,8 @@
 
 #include <boost/asio.hpp>
 #include <iostream>
-#include "ucoro/awaitable.hpp"
+#include <coroutine>
+import ucoro;
 
 boost::asio::io_context main_ioc;
 

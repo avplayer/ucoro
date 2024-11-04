@@ -1,7 +1,8 @@
 
 #pragma once
 
-#include "./awaitable.hpp"
+#include <coroutine>
+import ucoro;
 
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/co_spawn.hpp>

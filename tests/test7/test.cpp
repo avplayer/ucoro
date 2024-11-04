@@ -1,6 +1,7 @@
 ﻿
-#include "ucoro/awaitable.hpp"
 #include <iostream>
+#include <coroutine>
+import ucoro;
 
 ucoro::awaitable<int> test()
 {

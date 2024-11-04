@@ -1,7 +1,9 @@
 #include <iostream>
-#include "ucoro/awaitable.hpp"
-
 #include <ares.h>
+#include <memory>
+#include <coroutine>
+#include <vector>
+import ucoro;
 
 
 ////////////////////////////////////////////////////////////////////
