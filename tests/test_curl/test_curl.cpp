@@ -5,49 +5,50 @@
 
 #include "curl/curl.h"
 
-struct completion_job_data
+template<typename ResultType>
+struct handler_wrapper
 {
-	static void do_completion_job(void* completion_data)
+	static void invoke_once(void* completion_data, ResultType arg)
 	{
-		(*reinterpret_cast<completion_job_data*>(completion_data))();
-		delete reinterpret_cast<completion_job_data*>(completion_data);
+		(*reinterpret_cast<handler_wrapper*>(completion_data))(arg);
+		delete reinterpret_cast<handler_wrapper*>(completion_data);
 	}
 
-	virtual ~completion_job_data()
+	virtual ~handler_wrapper()
 	{
 	}
 
-	virtual void operator() ()
+	virtual void operator() (ResultType)
 	{
 	}
 };
 
 
-template<typename continuation_t>
-struct completion_job_data_for_coro : public completion_job_data
+template<typename T, typename continuation_t>
+struct handler_wrapper_impl : public handler_wrapper<T>
 {
 	continuation_t continuation;
 
-	completion_job_data_for_coro(continuation_t&& continuation)
+	handler_wrapper_impl(continuation_t&& continuation)
 		: continuation(continuation)
 	{
 	}
 
-	virtual void operator() () override
+	virtual void operator() (T t) override
 	{
-		continuation();
+		continuation(std::move(t));
 	}
 };
 
-ucoro::awaitable<void> async_curl_http_post(std::string url)
+ucoro::awaitable<CURLcode> async_curl_http_post(std::string url)
 {
 	CURLM* curl = co_await ucoro::local_storage_t<CURLM*>{};
 
-	co_await callback_awaitable<void>([curl, url](auto continuation)
+	auto curl_code = co_await callback_awaitable<CURLcode>([curl, url](auto continuation)
 	{
 		auto http_handle = curl_easy_init();
 
-		auto complete_op = new completion_job_data_for_coro<decltype(continuation)>(std::move(continuation));
+		auto complete_op = new handler_wrapper_impl<CURLcode, decltype(continuation)>(std::move(continuation));
 
 		/* set the options (I left out a few, you get the point anyway) */
 		curl_easy_setopt(http_handle, CURLOPT_URL, url.c_str());
@@ -60,14 +61,12 @@ ucoro::awaitable<void> async_curl_http_post(std::string url)
 	});
 
 	// NOTE: 记住这个位置，叫 1 号位
-	co_return;
+	co_return curl_code;
 }
 
 ucoro::awaitable<int> coro_compute_int(std::string url)
 {
-	co_await async_curl_http_post(url);
-
-	co_return url.size();
+	co_return co_await async_curl_http_post(url);
 }
 
 ucoro::awaitable<void> coro_compute_exec(std::string url)
@@ -124,7 +123,7 @@ int main(int argc, char** argv)
 				curl_easy_getinfo(e, CURLINFO_PRIVATE, &completion_job_data);
 				if (completion_job_data)
 				{
-					completion_job_data::do_completion_job(completion_job_data);
+					handler_wrapper<CURLcode>::invoke_once(completion_job_data, msg->data.result);
 				}
 
 				curl_multi_remove_handle(curl, e);
