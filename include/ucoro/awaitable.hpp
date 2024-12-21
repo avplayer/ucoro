@@ -1,4 +1,4 @@
-//
+﻿//
 // Distributed under the Boost Software License, Version 1.0. (See accompanying
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
@@ -6,7 +6,17 @@
 #pragma once
 
 #include <concepts>
+#include <any>
+#include <cassert>
+#include <cstdlib>
+#include <memory>
+#include <type_traits>
+#include <atomic>
+#ifdef DISABLE_EXCEPTION
+#include <optional>
+#else
 #include <variant>
+#endif
 
 #if defined(__has_include)
 
@@ -30,14 +40,7 @@ namespace std
 
 #endif
 
-#include <any>
-#include <cassert>
-#include <cstdlib>
-#include <functional>
-#include <memory>
-#include <type_traits>
-#include <atomic>
-#include <cassert>
+
 
 #if defined(DEBUG) || defined(_DEBUG)
 #if defined(ENABLE_DEBUG_CORO_LEAK)
@@ -225,20 +228,29 @@ namespace ucoro
 
 		void unhandled_exception() noexcept
 		{
+#ifndef DISABLE_EXCEPTION
 			value_.template emplace<std::exception_ptr>(std::current_exception());
+#endif
 		}
 
 		T get_value() const
 		{
+#ifndef DISABLE_EXCEPTION
 			if (std::holds_alternative<std::exception_ptr>(value_))
 			{
 				std::rethrow_exception(std::get<std::exception_ptr>(value_));
 			}
 
 			return std::get<T>(value_);
+#else
+			return value_.value();
+#endif
 		}
-
+#ifndef DISABLE_EXCEPTION
 		std::variant<std::exception_ptr, T> value_{nullptr};
+#else
+		std::optional<T> value_;
+#endif
 	};
 
 	//////////////////////////////////////////////////////////////////////////
@@ -246,23 +258,28 @@ namespace ucoro
 	template<>
 	struct awaitable_promise_value<void>
 	{
+#ifndef DISABLE_EXCEPTION
 		std::exception_ptr exception_{nullptr};
-
+#endif
 		constexpr void return_void() noexcept
 		{
 		}
 
 		void unhandled_exception() noexcept
 		{
+#ifndef DISABLE_EXCEPTION
 			exception_ = std::current_exception();
+#endif
 		}
 
 		void get_value() const
 		{
+#ifndef DISABLE_EXCEPTION
 			if (exception_)
 			{
 				std::rethrow_exception(exception_);
 			}
+#endif
 		}
 	};
 
