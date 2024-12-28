@@ -15,8 +15,31 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     add_compile_options(-foptimize-sibling-calls)
 endif()
 
-add_library(ucoro INTERFACE)
-target_include_directories(ucoro INTERFACE include)
+include(GNUInstallDirs)
 
-enable_testing()
-add_subdirectory(tests)
+add_library(ucoro INTERFACE)
+target_include_directories(ucoro INTERFACE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+                                           $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
+
+option(UCORO_BUILD_TESTING "Build the tests" ON)
+if (UCORO_BUILD_TESTING)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
+
+install(
+    TARGETS ucoro
+    EXPORT ucoroTargets
+    INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+install(
+    DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ucoro
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+# generate config.cmake
+install(
+    EXPORT ucoroTargets
+    FILE ucoro-config.cmake
+    NAMESPACE ucoro::
+    DESTINATION "share/ucoro"
+)
