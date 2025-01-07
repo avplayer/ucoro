@@ -95,9 +95,9 @@ jobs:
     - name: Build Boost
       id: boost
       if: steps.cache-boost-build.outputs.cache-hit != 'true'
-      uses: egor-tensin/build-boost@v1.4
+      uses: mickem/build-boost@v1
       with:
-        version: 1.86.0
+        version: 1.87.0
         libraries: system thread atomic chrono
         platform: x64
         configuration: Release
