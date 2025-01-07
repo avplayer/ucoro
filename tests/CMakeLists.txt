@@ -10,6 +10,7 @@ find_package(Boost 1.60 COMPONENTS thread system atomic)
 if(Boost_FOUND)
     add_subdirectory(test_asio)
     add_subdirectory(test5)
+    add_subdirectory(test9)
 endif(Boost_FOUND)
 
 add_subdirectory(test3)
