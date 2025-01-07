@@ -4,6 +4,7 @@ set_target_properties(ucoro_tests PROPERTIES FOLDER "ucoro_tests")
 add_subdirectory(test1)
 add_subdirectory(test2)
 add_subdirectory(test7)
+add_subdirectory(test8)
 
 find_package(Boost 1.60 COMPONENTS thread system atomic)
 if(Boost_FOUND)
