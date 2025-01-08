@@ -22,40 +22,55 @@
 namespace ucoro::communication
 {
 
+struct dummy_mutex
+{
+	constexpr void lock() noexcept {}
+	constexpr void unlock() noexcept {}
+};
+
 /*
- * channel<>, 协程版的异步列队。但是线程不安全。
+ * channel<>, 协程版的异步列队。默认线程不安全。
  * 使用此channel的多个协程需要被同一个线程调度。
- * 否则会导致数据损坏
+ * 否则会导致数据损坏。需要线程安全则要在第二个参数上使用 std::mutex
  */
-template<typename T>
+template<typename T, typename MUTEX = dummy_mutex>
 class channel
 {
 	void wake_up_one_pusher()
 	{
 		if (m_push_awaiting.empty())
+		{
+			mutex.unlock();
 			return;
+		}
 		auto top_waiter = m_push_awaiting.front();
 		// wake up .
 		m_push_awaiting.pop_front();
+		mutex.unlock();
         top_waiter.resume();
 	}
 
 	void wake_up_one_poper()
 	{
+		mutex.lock();
 		if (m_pop_awaiting.empty())
 			return;
 		auto top_waiter = m_pop_awaiting.front();
 		// wake up .
 		m_pop_awaiting.pop_front();
+		mutex.unlock();
         top_waiter.resume();
+		mutex.lock();
 	}
 
     struct wait_on_queue
     {
+		MUTEX & mutex;
         std::deque<std::coroutine_handle<>> & wait_on;
 
-        wait_on_queue(std::deque<std::coroutine_handle<>> & wait_on)
-            : wait_on(wait_on)
+        wait_on_queue(MUTEX& mutex, std::deque<std::coroutine_handle<>> & wait_on)
+			: mutex(mutex)
+            , wait_on(wait_on)
         {}
 
         constexpr bool await_ready() noexcept { return false; }
@@ -65,16 +80,19 @@ class channel
         void await_suspend(std::coroutine_handle<> handle) noexcept
         {
             wait_on.push_back(handle);
+			mutex.unlock();
         }
     };
 
 public:
 	awaitable<T> pop()
 	{
+		mutex.lock();
 		if (m_queue.empty())
 		{
 			// yield
-            co_await wait_on_queue{m_pop_awaiting};
+            co_await wait_on_queue{mutex, m_pop_awaiting};
+			mutex.lock();
 		}
 		T r = m_queue.front();
 		m_queue.pop_front();
@@ -84,11 +102,16 @@ public:
 
 	awaitable<void> push(T t)
 	{
-		m_queue.push_back(t);
 		wake_up_one_poper();
-		if (m_queue.size() >= (m_max_pending))
+		m_queue.push_back(t);
+		if (m_queue.size() > (m_max_pending))
 		{
-            co_await wait_on_queue{m_push_awaiting};
+			// yield
+            co_await wait_on_queue{mutex, m_push_awaiting};
+		}
+		else
+		{
+			mutex.unlock();
 		}
 	}
 
@@ -100,9 +123,9 @@ public:
 
 	long m_max_pending;
 	std::deque<T> m_queue;
-
 	std::deque<std::coroutine_handle<>> m_pop_awaiting;
 	std::deque<std::coroutine_handle<>> m_push_awaiting;
+	MUTEX mutex;
 };
 
 template<typename T>
