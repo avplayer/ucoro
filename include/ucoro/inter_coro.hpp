@@ -262,6 +262,10 @@ class mutex
 		any_executor& executor;
 		std::coroutine_handle<> coro_handle;
 
+		lock_waiter(any_executor& e, std::coroutine_handle<> coro_handle)
+			: executor(e), coro_handle(coro_handle)
+		{}
+
 		void operator()()
 		{
 			executor.post(coro_handle);
